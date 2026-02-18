@@ -122,7 +122,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentStep, setStep, completedSteps,
         
         {/* GitHub Badge */}
         <a 
-          href="https://github.com/promto-c"
+          href="https://github.com/promto-c/cluster-lab"
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center gap-3 px-3 py-2 bg-gray-900 border border-gray-800 rounded-lg hover:border-gray-700 hover:bg-gray-800 transition-all group"

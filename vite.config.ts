@@ -8,7 +8,16 @@ const packageJson = JSON.parse(
   readFileSync(new URL('./package.json', import.meta.url), 'utf-8')
 ) as { version: string };
 
+const normalizedBase = (() => {
+  const rawBase = process.env.VITE_BASE_PATH?.trim();
+  if (!rawBase) return '/';
+
+  const withLeadingSlash = rawBase.startsWith('/') ? rawBase : `/${rawBase}`;
+  return withLeadingSlash.endsWith('/') ? withLeadingSlash : `${withLeadingSlash}/`;
+})();
+
 export default defineConfig({
+  base: normalizedBase,
   server: {
     port: 3000,
     host: '0.0.0.0',
