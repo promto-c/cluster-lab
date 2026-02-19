@@ -2,6 +2,60 @@
 
 import { PreprocessingConfig, ResizeMethod, PadStyle } from '../types';
 
+function reflectIndex(index: number, length: number): number {
+  if (length <= 1) return 0;
+  const period = 2 * length - 2;
+  let normalized = index % period;
+  if (normalized < 0) normalized += period;
+  return normalized < length ? normalized : period - normalized;
+}
+
+function drawReflectPaddedImage(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  canvasWidth: number,
+  canvasHeight: number,
+  drawX: number,
+  drawY: number,
+  drawWidth: number,
+  drawHeight: number
+): void {
+  const safeWidth = Math.max(1, drawWidth);
+  const safeHeight = Math.max(1, drawHeight);
+
+  const sourceCanvas = document.createElement('canvas');
+  sourceCanvas.width = safeWidth;
+  sourceCanvas.height = safeHeight;
+  const sourceCtx = sourceCanvas.getContext('2d');
+
+  if (!sourceCtx) {
+    ctx.drawImage(img, drawX, drawY, safeWidth, safeHeight);
+    return;
+  }
+
+  sourceCtx.drawImage(img, 0, 0, safeWidth, safeHeight);
+  const sourcePixels = sourceCtx.getImageData(0, 0, safeWidth, safeHeight).data;
+  const outputImage = ctx.createImageData(canvasWidth, canvasHeight);
+  const outputPixels = outputImage.data;
+
+  for (let py = 0; py < canvasHeight; py++) {
+    const sampleY = reflectIndex(py - drawY, safeHeight);
+
+    for (let px = 0; px < canvasWidth; px++) {
+      const sampleX = reflectIndex(px - drawX, safeWidth);
+      const sourceOffset = (sampleY * safeWidth + sampleX) * 4;
+      const outputOffset = (py * canvasWidth + px) * 4;
+
+      outputPixels[outputOffset] = sourcePixels[sourceOffset];
+      outputPixels[outputOffset + 1] = sourcePixels[sourceOffset + 1];
+      outputPixels[outputOffset + 2] = sourcePixels[sourceOffset + 2];
+      outputPixels[outputOffset + 3] = sourcePixels[sourceOffset + 3];
+    }
+  }
+
+  ctx.putImageData(outputImage, 0, 0);
+}
+
 export async function processImageForDisplay(
   file: File, 
   config: PreprocessingConfig, 
@@ -120,6 +174,12 @@ export async function processImageForDisplay(
                              ctx.drawImage(img, x, y, w, h);
                          }
 
+                    } else if (config.padStyle === PadStyle.REFLECT) {
+                         const reflectWidth = Math.max(1, Math.round(w));
+                         const reflectHeight = Math.max(1, Math.round(h));
+                         const reflectX = Math.floor((canvas.width - reflectWidth) / 2);
+                         const reflectY = Math.floor((canvas.height - reflectHeight) / 2);
+                         drawReflectPaddedImage(ctx, img, canvas.width, canvas.height, reflectX, reflectY, reflectWidth, reflectHeight);
                     } else {
                          // Solid Color
                          ctx.fillStyle = config.padColor;

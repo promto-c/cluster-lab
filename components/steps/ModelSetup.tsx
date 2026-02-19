@@ -567,14 +567,14 @@ const ModelSetup: React.FC<ModelSetupProps> = ({ config, onConfigChange, onLoadM
                                     <Layout className="w-4 h-4 text-green-400" /> Letterbox Pad
                                 </div>
                                 <p className="text-[10px] text-gray-500 mt-1 leading-snug">
-                                    Resize to fit within target, fill borders with color. Preserves entire image.
+                                    Resize to fit within target and fill borders with blur, mirror, or solid color.
                                 </p>
                             </div>
                             {config.preprocessing.resizeMethod === ResizeMethod.PAD && (
                                 <div className="absolute top-2 right-2"><Check className="w-4 h-4 text-accent-500" /></div>
                             )}
                             
-                            {/* Unified Pad Style Selector (Solid & Blur) */}
+                            {/* Unified Pad Style Selector */}
                             {config.preprocessing.resizeMethod === ResizeMethod.PAD && (
                                 <div className="mt-2 pt-2 border-t border-gray-700/50 flex items-center justify-between animate-fadeIn" onClick={(e) => e.stopPropagation()}>
                                     <span className="text-[10px] text-gray-400 font-semibold">Background</span>
@@ -586,6 +586,16 @@ const ModelSetup: React.FC<ModelSetupProps> = ({ config, onConfigChange, onLoadM
                                             title="Smart Blur"
                                         >
                                             <div className="absolute inset-0 bg-gradient-to-br from-pink-500 via-purple-500 to-cyan-500 blur-[1px]" />
+                                        </button>
+
+                                        {/* Mirror / Reflect */}
+                                        <button
+                                            onClick={() => onConfigChange({...config, preprocessing: {...config.preprocessing, padStyle: PadStyle.REFLECT}})}
+                                            className={`w-5 h-5 rounded-full border transition-all overflow-hidden relative ${config.preprocessing.padStyle === PadStyle.REFLECT ? 'border-white ring-2 ring-white/30 scale-110' : 'border-gray-600 hover:border-gray-400 opacity-90 hover:opacity-100'}`}
+                                            title="Mirror / Reflect"
+                                        >
+                                            <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-600 to-gray-200" />
+                                            <div className="absolute inset-y-0 left-1/2 w-px bg-gray-900/70 -translate-x-1/2" />
                                         </button>
 
                                         {/* Black (Solid) */}

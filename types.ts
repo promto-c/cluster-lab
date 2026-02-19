@@ -21,7 +21,8 @@ export enum ResizeMethod {
 
 export enum PadStyle {
   SOLID = 'SOLID',
-  BLUR = 'BLUR'
+  BLUR = 'BLUR',
+  REFLECT = 'REFLECT'
 }
 
 export interface ClassicalFeaturesConfig {

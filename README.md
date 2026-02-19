@@ -19,7 +19,7 @@ https://promto-c.github.io/cluster-lab/
 
 - 4-step pipeline: `Initialize -> Dataset -> Embed -> Cluster`
 - Model sources: Hugging Face (`Xenova/dinov2-small`, `base`, `large`, or custom repo ID), local ONNX model folder, or classical CV descriptors (Color Histogram, LBP, GLCM, HOG)
-- Preprocessing controls: `Letterbox Pad` (blur or solid), `Stretch`, `Center Crop`
+- Preprocessing controls: `Letterbox Pad` (blur, mirror/reflect, or solid), `Stretch`, `Center Crop`
 - Dataset tooling: add files/folders, example datasets, enable/disable/focus batch controls
 - Embedding studio: batch embedding generation, 3D patch visualization (PCA or channel mode), and local vs global PCA color basis
 - Clustering lab: Agglomerative, KMeans, HDBSCAN-style density clustering, and BIRCH with cosine/euclidean metrics, normalization, auto-tuning, and dendrogram thresholding
