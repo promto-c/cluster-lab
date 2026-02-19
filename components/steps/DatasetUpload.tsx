@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { GalleryItem } from '../../types';
 import Gallery from '../Gallery';
-import { UploadCloud, FolderUp, ImagePlus, Loader2, Database, ChevronDown, FileJson } from 'lucide-react';
+import { Files, FolderUp, ImagePlus, Loader2, Database, ChevronDown, FileJson } from 'lucide-react';
 import { Button, buttonStyles } from '../Button';
 import { generateThumbnail } from '../../utils/imageProcessing';
 
@@ -83,7 +83,7 @@ const DatasetUpload: React.FC<DatasetUploadProps> = ({
   onEmbeddingsImported
 }) => {
   const [loadingExample, setLoadingExample] = useState<string | null>(null);
-  const [exampleCount, setExampleCount] = useState(4);
+  const [exampleCount, setExampleCount] = useState(12);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -268,7 +268,7 @@ const DatasetUpload: React.FC<DatasetUploadProps> = ({
 
              <div className="w-px h-6 bg-gray-800 hidden xl:block mx-1"></div>
 
-             {/* Action Buttons - Uniform Style using buttonStyles */}
+             {/* Action Buttons */}
              <div className="flex items-center gap-2">
                 <label className="cursor-pointer">
                    <input type="file" onChange={handleImportEmbeddings} className="hidden" accept=".json" />
@@ -278,26 +278,30 @@ const DatasetUpload: React.FC<DatasetUploadProps> = ({
                    </div>
                 </label>
 
-                <label className="cursor-pointer">
-                   <input type="file" onChange={handleFileChange} className="hidden" accept="image/*" multiple />
-                   <div className={`${buttonStyles.base} ${buttonStyles.variants.default}`}>
-                      <UploadCloud className="w-3.5 h-3.5" />
-                      Add Files
-                   </div>
-                </label>
-                
-                <label className="cursor-pointer">
-                   <input 
-                      type="file" 
-                      {...({ webkitdirectory: "", directory: "" } as any)} 
-                      onChange={handleFileChange} 
-                      className="hidden" 
-                   />
-                   <div className={`${buttonStyles.base} ${buttonStyles.variants.default} group`}>
-                      <FolderUp className="w-3.5 h-3.5 text-accent-500 group-hover:text-accent-400" />
-                      Import Folder
-                   </div>
-                </label>
+                <div className="inline-flex items-stretch overflow-hidden rounded-md border border-gray-700 bg-gray-800 text-xs font-medium shadow-sm">
+                   <label className="cursor-pointer group">
+                      <input type="file" onChange={handleFileChange} className="hidden" accept="image/*" multiple />
+                      <div className="flex h-full items-center gap-2 px-3 py-1.5 text-gray-300 transition-colors hover:bg-gray-700 hover:text-white">
+                         <Files className="w-3.5 h-3.5 text-gray-400 transition-colors group-hover:text-gray-200" />
+                         Add Files
+                      </div>
+                   </label>
+
+                   <div className="w-px bg-gray-700" />
+
+                   <label className="cursor-pointer group">
+                      <input
+                         type="file"
+                         {...({ webkitdirectory: "", directory: "" } as any)}
+                         onChange={handleFileChange}
+                         className="hidden"
+                      />
+                      <div className="flex h-full items-center gap-2 px-3 py-1.5 text-gray-300 transition-colors hover:bg-gray-700 hover:text-white">
+                         <FolderUp className="w-3.5 h-3.5 text-gray-400 transition-colors group-hover:text-gray-200" />
+                         Import Folder
+                      </div>
+                   </label>
+                </div>
              </div>
          </div>
       </div>

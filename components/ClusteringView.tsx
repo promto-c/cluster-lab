@@ -996,7 +996,6 @@ const ClusteringView: React.FC<ClusteringViewProps> = ({ items, onUpdateItems, i
                   groupBy={groupByFn}
                   groupTitleBuilder={renderGroupTitle}
                   onUpdateItems={onUpdateItems}
-                  onClear={() => {}}
                   onDrillDown={handleSubCluster}
                   defaultDensity="compact"
                   headerMeta={stats ? (

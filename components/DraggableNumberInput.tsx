@@ -49,10 +49,31 @@ const parseDraftNumber = (draft: string): number | null => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+const TRACKPAD_PIXELS_PER_STEP = 40;
+const MOUSE_WHEEL_PIXEL_DELTA_CUTOFF = 100;
+const MOUSE_WHEEL_PIXELS_PER_STEP = 120;
+const WHEEL_LINES_PER_STEP = 3;
+
 const normalizeWheelDelta = (event: React.WheelEvent): number => {
-  if (event.deltaMode === 1) return event.deltaY * 16;
-  if (event.deltaMode === 2) return event.deltaY * 120;
-  return event.deltaY;
+  if (event.deltaMode === 1) {
+    return event.deltaY / WHEEL_LINES_PER_STEP;
+  }
+  if (event.deltaMode === 2) {
+    return event.deltaY;
+  }
+
+  const pixelDelta = event.deltaY;
+  const absPixelDelta = Math.abs(pixelDelta);
+
+  // Most mouse wheels send a large discrete pixel delta (commonly 100-120).
+  // Snap those to whole steps so `step` maps 1:1 with one wheel notch.
+  if (absPixelDelta >= MOUSE_WHEEL_PIXEL_DELTA_CUTOFF) {
+    const wheelSteps = Math.max(1, Math.round(absPixelDelta / MOUSE_WHEEL_PIXELS_PER_STEP));
+    return Math.sign(pixelDelta) * wheelSteps;
+  }
+
+  // Trackpads usually emit many small deltas, so keep accumulation smooth.
+  return pixelDelta / TRACKPAD_PIXELS_PER_STEP;
 };
 
 const getStepPrecision = (step: number): number => {
@@ -96,7 +117,6 @@ const DraggableNumberInput: React.FC<DraggableNumberInputProps> = ({
   pageStepMultiplier = 10,
   dragPixelsPerStep = 10,
 }) => {
-  const WHEEL_STEP_THRESHOLD = 40;
   const dragRef = React.useRef<DragState | null>(null);
   const wheelAccumulatorRef = React.useRef(0);
   const committedValueRef = React.useRef(0);
@@ -192,15 +212,15 @@ const DraggableNumberInput: React.FC<DraggableNumberInputProps> = ({
 
     wheelAccumulatorRef.current += normalizeWheelDelta(event);
     const direction = wheelAccumulatorRef.current < 0 ? 1 : -1;
-    const steps = Math.trunc(Math.abs(wheelAccumulatorRef.current) / WHEEL_STEP_THRESHOLD);
+    const steps = Math.trunc(Math.abs(wheelAccumulatorRef.current));
     if (steps <= 0) return;
 
     nudgeValue(direction * baseStep * steps);
 
     if (wheelAccumulatorRef.current < 0) {
-      wheelAccumulatorRef.current += steps * WHEEL_STEP_THRESHOLD;
+      wheelAccumulatorRef.current += steps;
     } else {
-      wheelAccumulatorRef.current -= steps * WHEEL_STEP_THRESHOLD;
+      wheelAccumulatorRef.current -= steps;
     }
   }, [
     disabled,
@@ -209,7 +229,6 @@ const DraggableNumberInput: React.FC<DraggableNumberInputProps> = ({
     nudgeValue,
     pageStepMultiplier,
     safeStep,
-    WHEEL_STEP_THRESHOLD,
   ]);
 
   const handlePointerDown = React.useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
