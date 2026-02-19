@@ -12,6 +12,7 @@ interface ClusteringViewProps {
   isProcessing: boolean;
   setIsProcessing: (val: boolean) => void;
   onLog?: (message: string, type?: 'info' | 'success' | 'error') => void;
+  onProgressUpdate?: (progress: { mode: 'cluster' | 'tune'; value: number; message: string } | null) => void;
 }
 
 // Breadcrumb Separator with Dropdown
@@ -72,7 +73,7 @@ const BreadcrumbSeparator: React.FC<{
 };
 
 
-const ClusteringView: React.FC<ClusteringViewProps> = ({ items, onUpdateItems, isProcessing, setIsProcessing, onLog }) => {
+const ClusteringView: React.FC<ClusteringViewProps> = ({ items, onUpdateItems, isProcessing, setIsProcessing, onLog, onProgressUpdate }) => {
   const [showConfig, setShowConfig] = useState(false);
   
   // Default Config
@@ -141,34 +142,12 @@ const ClusteringView: React.FC<ClusteringViewProps> = ({ items, onUpdateItems, i
   const [tuningState, setTuningState] = useState<{ active: boolean, progress: number, message: string }>({
     active: false, progress: 0, message: ''
   });
-  const progressLogRef = useRef<{ stream: 'cluster' | 'tune' | ''; bucket: number; message: string }>({
-    stream: '',
-    bucket: -1,
-    message: ''
-  });
-
-  const resetProgressLog = (stream: 'cluster' | 'tune') => {
-    progressLogRef.current = { stream, bucket: -1, message: '' };
-  };
-
-  const logProgressToSystem = (stream: 'cluster' | 'tune', progress: number, message: string) => {
-    if (!onLog) return;
-    const pct = Math.max(0, Math.min(100, Math.round(progress)));
-    const bucket = Math.floor(pct / 10);
-    const isHighChurnMessage = message.startsWith('Coarse K=') || message.startsWith('Refine K=') || message.startsWith('Testing K=');
-
-    if (progressLogRef.current.stream !== stream) {
-      resetProgressLog(stream);
-    }
-
-    const state = progressLogRef.current;
-    const bucketChanged = bucket !== state.bucket;
-    const stageChanged = !isHighChurnMessage && message !== state.message;
-    if (!bucketChanged && !stageChanged && pct !== 100) return;
-
-    const prefix = stream === 'tune' ? 'Smart tune' : 'Clustering';
-    onLog(`${prefix} ${pct}% - ${message}`, 'info');
-    progressLogRef.current = { stream, bucket, message };
+  const updateProgress = (mode: 'cluster' | 'tune', value: number, message: string) => {
+    onProgressUpdate?.({
+      mode,
+      value: Math.max(0, Math.min(100, Math.round(value))),
+      message
+    });
   };
 
   const summarizeSuggestion = (suggestion: Partial<ClusteringConfig>): string => {
@@ -260,14 +239,14 @@ const ClusteringView: React.FC<ClusteringViewProps> = ({ items, onUpdateItems, i
     const runSignature = clusteringSignature;
     const pathLabel = currentPath.length > 0 ? currentPath.join(' > ') : 'root';
     onLog?.(`Clustering started (${readyCount} items, path: ${pathLabel}).`, 'info');
-    resetProgressLog('cluster');
+    updateProgress('cluster', 0, 'Initializing...');
 
     try {
       await new Promise(r => setTimeout(r, 10));
 
       // Run clustering ONLY on the active subset
       const result = await runClustering(activeItems, config, (p, msg) => {
-        logProgressToSystem('cluster', p, msg);
+        updateProgress('cluster', p, msg);
       });
         
       // Update items: We need to update ONLY the items involved, appending the new label to their path
@@ -296,11 +275,13 @@ const ClusteringView: React.FC<ClusteringViewProps> = ({ items, onUpdateItems, i
       }
       lastRunSignatureByPath.current[runPathKey] = runSignature;
       onLog?.(`Clustering complete: ${result.clusterCount} clusters, ${result.noiseCount} noise.`, 'success');
+      updateProgress('cluster', 100, 'Clustering complete');
       
     } catch (e) {
       console.error(e);
       onLog?.(`Clustering failed: ${(e as Error)?.message || 'Unknown error'}`, 'error');
     } finally {
+      onProgressUpdate?.(null);
       setIsProcessing(false);
     }
   };
@@ -310,19 +291,21 @@ const ClusteringView: React.FC<ClusteringViewProps> = ({ items, onUpdateItems, i
      setTuningState({ active: true, progress: 0, message: 'Initializing...' });
      const pathLabel = currentPath.length > 0 ? currentPath.join(' > ') : 'root';
      onLog?.(`Smart tune started (${readyCount} items, path: ${pathLabel}).`, 'info');
-     resetProgressLog('tune');
+     updateProgress('tune', 0, 'Initializing...');
      
      try {
         const suggestion = await suggestConfig(activeItems, config, (p, msg) => {
             setTuningState({ active: true, progress: p, message: msg });
-            logProgressToSystem('tune', p, msg);
+            updateProgress('tune', p, msg);
         });
         setConfig(prev => ({ ...prev, ...suggestion }));
         onLog?.(`Smart tune complete: ${summarizeSuggestion(suggestion)}.`, 'success');
+        updateProgress('tune', 100, 'Optimization complete');
      } catch(e) {
         console.error("Auto tuning failed", e);
         onLog?.(`Smart tune failed: ${(e as Error)?.message || 'Unknown error'}`, 'error');
      } finally {
+        onProgressUpdate?.(null);
         setTuningState(prev => ({ ...prev, active: false }));
      }
   };

@@ -40,6 +40,7 @@ const App: React.FC = () => {
   const [status, setStatus] = useState<ProcessingStatus>('idle');
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [showLogs, setShowLogs] = useState(false);
+  const [logProgress, setLogProgress] = useState<{ mode: 'cluster' | 'tune'; value: number; message: string } | null>(null);
   const [modelDownloadProgress, setModelDownloadProgress] = useState<ModelDownloadProgressEntry[]>([]);
   const activeRunControllerRef = useRef<AbortController | null>(null);
   const singleRunTargetIdRef = useRef<string | null>(null);
@@ -512,6 +513,12 @@ const App: React.FC = () => {
   useEffect(() => {
     document.title = isStandalonePwa ? `ClusterLab v${__APP_VERSION__}` : 'ClusterLab';
   }, [isStandalonePwa]);
+
+  useEffect(() => {
+    if (currentStep !== AppStep.CLUSTER) {
+      setLogProgress(null);
+    }
+  }, [currentStep]);
   
   const completedSteps = [
     modelReady,          // Init
@@ -585,12 +592,22 @@ const App: React.FC = () => {
               isProcessing={status === 'clustering'}
               setIsProcessing={(val) => setStatus(val ? 'clustering' : 'ready')}
               onLog={addLog}
+              onProgressUpdate={setLogProgress}
             />
           )}
         </div>
 
         {/* Logs Panel - Collapsible */}
-        <div className={`flex flex-col bg-gray-900 border-t border-gray-800 shrink-0 transition-all duration-300 ease-in-out ${showLogs ? 'h-48' : 'h-9'}`}>
+        <div className={`relative flex flex-col bg-gray-900 border-t border-gray-800 shrink-0 transition-all duration-300 ease-in-out ${showLogs ? 'h-48' : 'h-9'}`}>
+           {!showLogs && logProgress && (
+             <div className="absolute left-0 top-0 z-10 h-px w-full bg-gray-800 pointer-events-none">
+               <div
+                 className="h-full bg-accent-500 transition-all duration-200"
+                 style={{ width: `${Math.max(0, Math.min(100, logProgress.value))}%` }}
+               />
+             </div>
+           )}
+
            <div className="px-4 py-2 bg-gray-900 border-b border-gray-800 flex items-center justify-between cursor-pointer hover:bg-gray-800/50" onClick={() => setShowLogs(!showLogs)}>
               <div className="flex items-center gap-2 text-xs font-mono text-gray-500 uppercase overflow-hidden flex-1 mr-4">
                 <Terminal className="w-3 h-3 shrink-0" /> 
@@ -626,8 +643,24 @@ const App: React.FC = () => {
                  </div>
               </div>
            </div>
-           
+
            <div className="flex-1 overflow-y-auto p-3 font-mono text-[10px] space-y-1 scrollbar-thin bg-gray-950">
+               {logProgress && (
+                 <div className="mb-2 pb-2 border-b border-gray-800">
+                   <div className="flex items-center justify-between gap-2 text-gray-500 mb-1">
+                     <span className="truncate normal-case">
+                       {logProgress.mode === 'tune' ? 'Smart tune' : 'Clustering'}: {logProgress.message}
+                     </span>
+                     <span className="shrink-0 text-accent-400 font-bold">{logProgress.value}%</span>
+                   </div>
+                   <div className="w-full h-1 bg-gray-800 rounded-full overflow-hidden">
+                     <div
+                       className="h-full bg-accent-500 transition-all duration-200"
+                       style={{ width: `${Math.max(0, Math.min(100, logProgress.value))}%` }}
+                     />
+                   </div>
+                 </div>
+               )}
                {logs.length === 0 && <span className="text-gray-700 italic">No activity recorded.</span>}
                {logs.slice().reverse().map((log, idx) => (
                  <div key={idx} className={`flex gap-2 ${log.type === 'error' ? 'text-red-400' : log.type === 'success' ? 'text-green-400' : 'text-gray-500'}`}>
