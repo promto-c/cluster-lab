@@ -51,22 +51,6 @@ Prerequisites: Node.js 18+
 3. Preview production build:
    `npm run preview`
 
-## Deploy to GitHub Pages
-
-This repository includes `.github/workflows/deploy-pages.yml` for automatic deployment.
-
-1. Push to the `main` branch.
-2. In GitHub, open `Settings -> Pages`.
-3. Under **Build and deployment**, set **Source** to **GitHub Actions**.
-4. Wait for the `Deploy to GitHub Pages` workflow to finish.
-5. Your site will be available at:
-   `https://promto-c.github.io/cluster-lab/`
-
-Notes:
-
-- If your default branch is not `main`, update the workflow trigger in `.github/workflows/deploy-pages.yml`.
-- The build uses `VITE_BASE_PATH` so asset paths resolve correctly for GitHub Pages project URLs.
-
 ## ONNX Runtime WASM Assets
 
 - The app self-hosts ONNX Runtime WASM binaries in `public/onnxruntime`.
