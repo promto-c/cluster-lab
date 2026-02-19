@@ -6,12 +6,44 @@ import { cosineDistance, euclideanDistance, normalizeVector, findElbowIndex } fr
 // --- Caching ---
 // In a real app, manage this carefully to avoid memory leaks.
 // We cache the Distance Matrix and the Linkage Matrix.
-let cachedDistMatrix: { idHash: string, matrix: Float32Array, size: number, metric: string } | null = null;
-let cachedLinkage: { idHash: string, steps: LinkageStep[], linkageType: string } | null = null;
+let cachedDistMatrix: { dataSignature: string, matrix: Float32Array, size: number, metric: DistanceMetric } | null = null;
+let cachedLinkage: { dataSignature: string, steps: LinkageStep[], linkageType: string, metric: DistanceMetric } | null = null;
 
-function generateIdHash(items: GalleryItem[]): string {
-  // Simple hash based on IDs to detect dataset changes
-  return items.map(i => i.id).join(',');
+const FNV_OFFSET_BASIS = 0x811c9dc5;
+const FNV_PRIME = 0x01000193;
+
+function mixHash(hash: number, value: number): number {
+    const mixed = Math.imul((hash ^ (value >>> 0)) >>> 0, FNV_PRIME);
+    return mixed >>> 0;
+}
+
+function hashString(hash: number, value: string): number {
+    let h = hash;
+    for (let i = 0; i < value.length; i++) {
+        h = mixHash(h, value.charCodeAt(i));
+    }
+    return h;
+}
+
+function hashEmbedding(hash: number, embedding: number[]): number {
+    let h = mixHash(hash, embedding.length);
+    for (let i = 0; i < embedding.length; i++) {
+        const v = embedding[i];
+        const quantized = Number.isFinite(v) ? Math.round(v * 1e6) : 0;
+        h = mixHash(h, quantized);
+    }
+    return h;
+}
+
+function generateDataSignature(items: GalleryItem[], normalize: boolean): string {
+    let hash = mixHash(FNV_OFFSET_BASIS, items.length);
+    hash = mixHash(hash, normalize ? 1 : 0);
+    for (const item of items) {
+        hash = hashString(hash, item.id);
+        const embedding = item.result?.embedding || [];
+        hash = hashEmbedding(hash, embedding);
+    }
+    return `${items.length}:${hash.toString(16)}`;
 }
 
 export async function runClustering(
@@ -30,7 +62,7 @@ export async function runClustering(
   }
   
   const distFn = config.metric === 'COSINE' ? cosineDistance : euclideanDistance;
-  const currentHash = generateIdHash(validItems);
+  const dataSignature = generateDataSignature(validItems, config.normalize);
 
   // 2. Execute Algorithm
   let labels: number[] = [];
@@ -49,21 +81,30 @@ export async function runClustering(
       let linkage: LinkageStep[];
       
       // We assume if dataset hash + metric + linkage type match, we can reuse linkage
-      if (cachedLinkage && cachedLinkage.idHash === currentHash && cachedLinkage.linkageType === config.linkage) {
+      if (
+        cachedLinkage &&
+        cachedLinkage.dataSignature === dataSignature &&
+        cachedLinkage.metric === config.metric &&
+        cachedLinkage.linkageType === config.linkage
+      ) {
         linkage = cachedLinkage.steps;
       } else {
         // We might need the distance matrix first
         let distMatrix: Float32Array;
         
-        if (cachedDistMatrix && cachedDistMatrix.idHash === currentHash && cachedDistMatrix.metric === config.metric) {
+        if (
+          cachedDistMatrix &&
+          cachedDistMatrix.dataSignature === dataSignature &&
+          cachedDistMatrix.metric === config.metric
+        ) {
            distMatrix = cachedDistMatrix.matrix;
         } else {
            distMatrix = computeDistanceMatrix(vectors, distFn);
-           cachedDistMatrix = { idHash: currentHash, matrix: distMatrix, size: vectors.length, metric: config.metric };
+           cachedDistMatrix = { dataSignature, matrix: distMatrix, size: vectors.length, metric: config.metric };
         }
 
         linkage = computeLinkageMatrix(distMatrix, vectors.length, config.linkage);
-        cachedLinkage = { idHash: currentHash, steps: linkage, linkageType: config.linkage };
+        cachedLinkage = { dataSignature, steps: linkage, linkageType: config.linkage, metric: config.metric };
       }
 
       linkageOut = linkage;
@@ -84,41 +125,7 @@ export async function runClustering(
   // --- Post-Process: Enforce Min Cluster Size (Global) ---
   // Any cluster with fewer items than minClusterSize (default 2) is marked as noise (-1).
   const effectiveMinSize = config.minClusterSize !== undefined ? config.minClusterSize : 2;
-  
-  if (effectiveMinSize > 1) {
-      const counts = new Map<number, number>();
-      for (const l of labels) {
-          if (l !== -1) counts.set(l, (counts.get(l) || 0) + 1);
-      }
-      
-      const smallClusters = new Set<number>();
-      for (const [lbl, count] of counts.entries()) {
-          if (count < effectiveMinSize) smallClusters.add(lbl);
-      }
-      
-      if (smallClusters.size > 0) {
-          // Remap to -1
-          for (let i = 0; i < labels.length; i++) {
-              if (smallClusters.has(labels[i])) labels[i] = -1;
-          }
-          
-          // Re-normalize IDs to be consecutive 0..N
-          const oldToNew = new Map<number, number>();
-          let nextId = 0;
-          // Sort to maintain stability
-          const validLabels = Array.from(counts.keys())
-              .filter(l => !smallClusters.has(l))
-              .sort((a, b) => a - b);
-              
-          for (const l of validLabels) oldToNew.set(l, nextId++);
-          
-          for (let i = 0; i < labels.length; i++) {
-              if (labels[i] !== -1) {
-                  labels[i] = oldToNew.get(labels[i])!;
-              }
-          }
-      }
-  }
+  labels = applyMinClusterSize(labels, effectiveMinSize);
 
   // 3. Map back to IDs
   const labelMap = new Map<string, number>();
@@ -155,19 +162,24 @@ export async function suggestConfig(
    if (currentConfig.normalize) vectors = vectors.map(v => normalizeVector(v));
    
    const distFn = currentConfig.metric === 'COSINE' ? cosineDistance : euclideanDistance;
+   const effectiveMinSize = currentConfig.minClusterSize !== undefined ? currentConfig.minClusterSize : 2;
    
    // --- AGGLOMERATIVE TUNING (Silhouette Based) ---
    if (currentConfig.algorithm === 'AGGLOMERATIVE') {
-      const currentHash = generateIdHash(validItems);
+      const dataSignature = generateDataSignature(validItems, currentConfig.normalize);
       onProgress?.(10, 'Computing Distance Matrix...');
       
       // 1. Get/Compute Distance Matrix
       let distMatrix: Float32Array;
-      if (cachedDistMatrix && cachedDistMatrix.idHash === currentHash && cachedDistMatrix.metric === currentConfig.metric) {
+      if (
+        cachedDistMatrix &&
+        cachedDistMatrix.dataSignature === dataSignature &&
+        cachedDistMatrix.metric === currentConfig.metric
+      ) {
          distMatrix = cachedDistMatrix.matrix;
       } else {
          distMatrix = computeDistanceMatrix(vectors, distFn);
-         cachedDistMatrix = { idHash: currentHash, matrix: distMatrix, size: vectors.length, metric: currentConfig.metric };
+         cachedDistMatrix = { dataSignature, matrix: distMatrix, size: vectors.length, metric: currentConfig.metric };
       }
 
       onProgress?.(30, 'Building Hierarchy...');
@@ -175,40 +187,96 @@ export async function suggestConfig(
 
       // 2. Get/Compute Linkage
       let linkage: LinkageStep[];
-      if (cachedLinkage && cachedLinkage.idHash === currentHash && cachedLinkage.linkageType === currentConfig.linkage) {
+      if (
+        cachedLinkage &&
+        cachedLinkage.dataSignature === dataSignature &&
+        cachedLinkage.metric === currentConfig.metric &&
+        cachedLinkage.linkageType === currentConfig.linkage
+      ) {
         linkage = cachedLinkage.steps;
       } else {
         linkage = computeLinkageMatrix(distMatrix, vectors.length, currentConfig.linkage);
-        cachedLinkage = { idHash: currentHash, steps: linkage, linkageType: currentConfig.linkage };
+        cachedLinkage = { dataSignature, steps: linkage, linkageType: currentConfig.linkage, metric: currentConfig.metric };
       }
 
       onProgress?.(50, 'Finding Optimal Cut Point...');
       
-      // 3. Split-based search (root -> deeper cuts), similar to interactive dendrogram exploration.
-      // We cap to 8 splits to keep UI responsive on large sets.
+      // 3. Adaptive split search:
+      //    - coarse pass scans a wide K range
+      //    - refine pass scans around the best coarse K
+      // This avoids hard-capping at K<=9 while keeping runtime practical.
       const n = vectors.length;
-      const maxSplits = Math.min(8, Math.max(0, n - 2)); // k from 2..(maxSplits+1)
+      const maxK = Math.max(2, n - 1);
+
+      const targetSamples = Math.max(12, Math.min(maxK - 1, Math.round(Math.sqrt(n) * 6)));
+      const coarseStride = Math.max(1, Math.floor((maxK - 1) / targetSamples));
+      const coarseSet = new Set<number>();
+      for (let k = 2; k <= maxK; k += coarseStride) coarseSet.add(k);
+      coarseSet.add(maxK);
+      for (let k = 2; k <= Math.min(maxK, 12); k++) coarseSet.add(k); // dense low-K exploration
+      const coarseKs = Array.from(coarseSet).sort((a, b) => a - b);
+
       let bestScore = -Infinity;
       let bestK = 2;
       let bestDist = getThresholdForClusterCount(linkage, 2);
-      
-      for (let split = 1; split <= maxSplits; split++) {
-         const k = split + 1;
-         const labels = getLabelsFromLinkage(linkage, n, k, undefined);
-         const score = computeSilhouetteFromMatrix(distMatrix, n, labels, k);
-         
-         // >= prefers a deeper cut when scores tie, matching the reference behavior.
-         if (score >= bestScore) {
+
+      const scoreCache = new Map<number, { score: number, effectiveK: number }>();
+      const evaluateK = (k: number): { score: number, effectiveK: number } => {
+          const cached = scoreCache.get(k);
+          if (cached) return cached;
+
+          const rawLabels = getLabelsFromLinkage(linkage, n, k, undefined);
+          const adjustedLabels = applyMinClusterSize(rawLabels, effectiveMinSize);
+          const effectiveK = getMaxLabel(adjustedLabels) + 1;
+          const score = computeSilhouetteFromMatrix(distMatrix, n, adjustedLabels, effectiveK);
+          const result = { score, effectiveK };
+          scoreCache.set(k, result);
+          return result;
+      };
+
+      for (let i = 0; i < coarseKs.length; i++) {
+         const k = coarseKs[i];
+         const { score, effectiveK } = evaluateK(k);
+
+         // >= prefers deeper cuts on ties, matching interactive exploration.
+         if (score > bestScore || (score === bestScore && k >= bestK)) {
              bestScore = score;
              bestK = k;
-             const splitStepIndex = linkage.length - split;
-             const splitDistance = linkage[splitStepIndex]?.distance ?? 0;
+             const splitStepIndex = n - k;
+             const splitDistance = linkage[splitStepIndex]?.distance ?? Infinity;
              bestDist = getThresholdFromSplitDistance(linkage, splitDistance, k);
          }
-         
+
          if (onProgress) {
-             const percent = 50 + Math.floor((split / maxSplits) * 50);
-             onProgress(percent, `Evaluating cut K=${k} (Score: ${score.toFixed(3)})`);
+             const percent = 50 + Math.floor(((i + 1) / coarseKs.length) * 35);
+             onProgress(percent, `Coarse K=${k} (effective=${effectiveK}, score=${score.toFixed(3)})`);
+             await new Promise(r => setTimeout(r, 0)); // Yield UI
+         }
+      }
+
+      const refineRadius = Math.max(4, coarseStride * 2);
+      const refineStart = Math.max(2, bestK - refineRadius);
+      const refineEnd = Math.min(maxK, bestK + refineRadius);
+      const refineKs: number[] = [];
+      for (let k = refineStart; k <= refineEnd; k++) {
+          if (!coarseSet.has(k)) refineKs.push(k);
+      }
+
+      for (let i = 0; i < refineKs.length; i++) {
+         const k = refineKs[i];
+         const { score, effectiveK } = evaluateK(k);
+
+         if (score > bestScore || (score === bestScore && k >= bestK)) {
+             bestScore = score;
+             bestK = k;
+             const splitStepIndex = n - k;
+             const splitDistance = linkage[splitStepIndex]?.distance ?? Infinity;
+             bestDist = getThresholdFromSplitDistance(linkage, splitDistance, k);
+         }
+
+         if (onProgress) {
+             const percent = 85 + Math.floor(((i + 1) / Math.max(1, refineKs.length)) * 15);
+             onProgress(percent, `Refine K=${k} (effective=${effectiveK}, score=${score.toFixed(3)})`);
              await new Promise(r => setTimeout(r, 0)); // Yield UI
          }
       }
@@ -309,6 +377,48 @@ function getThresholdFromSplitDistance(linkage: LinkageStep[], splitDistance: nu
         return getThresholdForClusterCount(linkage, targetK);
     }
     return nudged;
+}
+
+function getMaxLabel(labels: number[]): number {
+    let maxLabel = -1;
+    for (const label of labels) {
+        if (label > maxLabel) maxLabel = label;
+    }
+    return maxLabel;
+}
+
+function applyMinClusterSize(labels: number[], minClusterSize: number): number[] {
+    const adjusted = labels.slice();
+
+    if (minClusterSize > 1) {
+        const counts = new Map<number, number>();
+        for (const label of adjusted) {
+            if (label === -1) continue;
+            counts.set(label, (counts.get(label) || 0) + 1);
+        }
+
+        const smallClusters = new Set<number>();
+        for (const [label, count] of counts.entries()) {
+            if (count < minClusterSize) smallClusters.add(label);
+        }
+
+        if (smallClusters.size > 0) {
+            for (let i = 0; i < adjusted.length; i++) {
+                if (smallClusters.has(adjusted[i])) adjusted[i] = -1;
+            }
+        }
+    }
+
+    // Re-normalize IDs to be consecutive 0..N while preserving -1 as noise.
+    const normalized = adjusted.slice();
+    const oldToNew = new Map<number, number>();
+    let nextId = 0;
+    const validLabels = Array.from(new Set(normalized.filter(l => l !== -1))).sort((a, b) => a - b);
+    for (const label of validLabels) oldToNew.set(label, nextId++);
+    for (let i = 0; i < normalized.length; i++) {
+        if (normalized[i] !== -1) normalized[i] = oldToNew.get(normalized[i])!;
+    }
+    return normalized;
 }
 
 // --- Helper: Matrix & Linkage Calculations ---
@@ -447,18 +557,18 @@ function getLabelsFromLinkage(
 // --- Silhouette Score Optimized ---
 
 function computeSilhouetteFromMatrix(distMatrix: Float32Array, n: number, labels: number[], k: number): number {
-    if (k < 2 || k >= n) return -1;
+    if (n === 0 || k < 2) return 0;
     const clusterIndices: number[][] = Array.from({length: k}, () => []);
     for(let i=0; i<n; i++) {
-        if (labels[i] !== -1) clusterIndices[labels[i]].push(i);
+        const label = labels[i];
+        if (label >= 0 && label < k) clusterIndices[label].push(i);
     }
     let totalScore = 0;
-    let validCount = 0;
     for(let i=0; i<n; i++) {
         const label = labels[i];
-        if (label === -1) continue;
+        if (label < 0 || label >= k) continue; // Noise or invalid labels contribute 0.
         const ownCluster = clusterIndices[label];
-        if (ownCluster.length < 2) continue; 
+        if (ownCluster.length < 2) continue; // Singleton clusters contribute 0.
         
         let sumA = 0;
         for(const peer of ownCluster) {
@@ -483,9 +593,8 @@ function computeSilhouetteFromMatrix(distMatrix: Float32Array, n: number, labels
         if (minB === Infinity) s = 0; 
         else s = (minB - a) / Math.max(a, minB);
         totalScore += s;
-        validCount++;
     }
-    return validCount > 0 ? totalScore / validCount : -1;
+    return totalScore / n;
 }
 
 function computeSimplifiedSilhouette(vectors: number[][], labels: number[], k: number, distFn: any): number {

@@ -156,10 +156,29 @@ const ClusteringView: React.FC<ClusteringViewProps> = ({ items, onUpdateItems, i
 
   const readyItems = activeItems.filter(i => i.status === 'cached' && i.enabled !== false);
   const readyCount = readyItems.length;
-  const readyItemsKey = useMemo(
-    () => readyItems.map(item => item.id).sort().join('|'),
-    [readyItems]
-  );
+  const readyItemsKey = useMemo(() => {
+    // Include embedding content so auto-run reacts to vector updates, not only item IDs.
+    let hash = 0x811c9dc5;
+    const mix = (value: number) => {
+      hash = Math.imul((hash ^ (value >>> 0)) >>> 0, 0x01000193) >>> 0;
+    };
+    const mixString = (value: string) => {
+      for (let i = 0; i < value.length; i++) mix(value.charCodeAt(i));
+    };
+
+    mix(readyItems.length);
+    for (const item of readyItems) {
+      mixString(item.id);
+      const embedding = item.result?.embedding || [];
+      mix(embedding.length);
+      for (let i = 0; i < embedding.length; i++) {
+        const q = Number.isFinite(embedding[i]) ? Math.round(embedding[i] * 1e6) : 0;
+        mix(q);
+      }
+    }
+
+    return `${readyItems.length}:${hash.toString(16)}`;
+  }, [readyItems]);
   const clusteringSignature = useMemo(
     () => JSON.stringify({ config, readyItemsKey }),
     [config, readyItemsKey]
