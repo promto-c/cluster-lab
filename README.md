@@ -3,6 +3,15 @@
 ClusterLab is a browser-based workspace for image embeddings and clustering.  
 You can run DINOv2 models from Hugging Face or local ONNX files, extract embeddings, visualize patch features in 3D, and explore clusters interactively.
 
+## Project Positioning
+
+This repository is an experimental playground for image clustering and visual data exploration.  
+It is intended for fast iteration, concept validation, and UI/algorithm experimentation.
+
+## Roadmap Direction
+
+This playground informs a future production-grade asset platform with image clustering and visual search, designed to operate across multi-source storage environments, including local file systems, S3-compatible object storage, and major online file services.
+
 ## Live Demo
 https://promto-c.github.io/cluster-lab/
 
