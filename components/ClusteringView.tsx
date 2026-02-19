@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { GalleryItem, ClusteringConfig, ClusteringAlgorithm, DistanceMetric, LinkageMethod, LinkageStep } from '../types';
-import { runClustering, suggestConfig, getClusterCountFromThreshold, getThresholdForClusterCount } from '../services/clusteringService';
+import { runClustering, suggestConfig, getClusterCountFromThreshold, getThresholdForClusterCount, cutAgglomerativeHierarchy } from '../services/clusteringService';
 import Dendrogram from './Dendrogram';
 import Gallery from './Gallery';
 import DraggableNumberInput from './DraggableNumberInput';
@@ -14,6 +14,40 @@ interface ClusteringViewProps {
   onLog?: (message: string, type?: 'info' | 'success' | 'error') => void;
   onProgressUpdate?: (progress: { mode: 'cluster' | 'tune'; value: number; message: string } | null) => void;
 }
+
+interface AgglomerativeHierarchyMeta {
+  pathKey: string;
+  readyItemsKey: string;
+  metric: DistanceMetric;
+  normalize: boolean;
+  linkage: LinkageMethod;
+  itemIds: string[];
+}
+
+const getAgglomerativeItemIds = (items: GalleryItem[]): string[] =>
+  items
+    .filter(item => item.result?.embedding && item.enabled !== false)
+    .map(item => item.id);
+
+const applyLabelsAtDepth = (sourceItems: GalleryItem[], labels: Map<string, number>, depth: number): GalleryItem[] =>
+  sourceItems.map(item => {
+    if (!labels.has(item.id)) return item;
+
+    const newLabel = labels.get(item.id)!;
+    const existingPath = item.clusterPath || [];
+    const base = existingPath.slice(0, depth);
+    const previousLabelAtDepth = existingPath[depth];
+    const suffix = existingPath.slice(depth + 1);
+    const preserveSuffix = suffix.length > 0 && previousLabelAtDepth === newLabel;
+
+    return {
+      ...item,
+      clusterPath: preserveSuffix ? [...base, newLabel, ...suffix] : [...base, newLabel],
+      clusterLabel: newLabel
+    };
+  });
+
+const DEFAULT_AGGLOMERATIVE_CUT = 0.4;
 
 // Breadcrumb Separator with Dropdown
 const BreadcrumbSeparator: React.FC<{
@@ -89,7 +123,7 @@ const ClusteringView: React.FC<ClusteringViewProps> = ({ items, onUpdateItems, i
     init: 'random',
     maxIter: 300,
     linkage: 'AVERAGE',
-    distanceThreshold: 0.4,
+    distanceThreshold: DEFAULT_AGGLOMERATIVE_CUT,
     birchThreshold: 0.5,
     birchBranching: 50
   };
@@ -105,6 +139,8 @@ const ClusteringView: React.FC<ClusteringViewProps> = ({ items, onUpdateItems, i
   const [projectedK, setProjectedK] = useState<number | null>(null);
   // Per-path signature of the last successful clustering run.
   const lastRunSignatureByPath = useRef<Record<string, string>>({});
+  const agglomerativeHierarchyMeta = useRef<AgglomerativeHierarchyMeta | null>(null);
+  const clusteredContexts = useRef<Set<string>>(new Set());
 
   // Keep track of which paths have been auto-tuned in this session
   const visitedPaths = useRef<Set<string>>(new Set());
@@ -208,6 +244,7 @@ const ClusteringView: React.FC<ClusteringViewProps> = ({ items, onUpdateItems, i
   useEffect(() => {
       setStats(null);
       setLinkageData(null);
+      agglomerativeHierarchyMeta.current = null;
   }, [currentPath]);
   
   // Save/Load Config on Path Change
@@ -227,9 +264,20 @@ const ClusteringView: React.FC<ClusteringViewProps> = ({ items, onUpdateItems, i
       const newPathKey = newPath.join(',');
       setCurrentPath(newPath);
       
-      if (configCache[newPathKey]) {
-          setConfig(configCache[newPathKey]);
-      } 
+      const cachedPathConfig = configCache[newPathKey];
+      if (cachedPathConfig) {
+          setConfig(cachedPathConfig);
+          return;
+      }
+
+      // New sub-cluster contexts should start agglomerative cuts from a stable visual default.
+      if (newPath.length > 0) {
+          setConfig(prev =>
+            prev.algorithm === 'AGGLOMERATIVE'
+              ? { ...prev, distanceThreshold: DEFAULT_AGGLOMERATIVE_CUT, nClusters: undefined }
+              : prev
+          );
+      }
   };
 
   const handleRunClustering = async () => {
@@ -237,6 +285,8 @@ const ClusteringView: React.FC<ClusteringViewProps> = ({ items, onUpdateItems, i
     setIsProcessing(true);
     const runPathKey = currentPath.join(',');
     const runSignature = clusteringSignature;
+    const runReadyItemsKey = readyItemsKey;
+    const runAlgorithm = config.algorithm;
     const pathLabel = currentPath.length > 0 ? currentPath.join(' > ') : 'root';
     onLog?.(`Clustering started (${readyCount} items, path: ${pathLabel}).`, 'info');
     updateProgress('cluster', 0, 'Initializing...');
@@ -250,30 +300,27 @@ const ClusteringView: React.FC<ClusteringViewProps> = ({ items, onUpdateItems, i
       });
         
       // Update items: We need to update ONLY the items involved, appending the new label to their path
-      const updatedItems = items.map(item => {
-          if (!result.labels.has(item.id)) return item;
-          
-          const newLabel = result.labels.get(item.id)!;
-          const existingPath = item.clusterPath || [];
-          const base = existingPath.slice(0, currentPath.length);
-          const previousLabelAtDepth = existingPath[currentPath.length];
-          const suffix = existingPath.slice(currentPath.length + 1);
-          const preserveSuffix = suffix.length > 0 && previousLabelAtDepth === newLabel;
-          
-          return {
-              ...item,
-              clusterPath: preserveSuffix ? [...base, newLabel, ...suffix] : [...base, newLabel],
-              clusterLabel: newLabel // Update the label for "GroupBy" convenience at this level
-          };
-      });
+      const updatedItems = applyLabelsAtDepth(items, result.labels, currentPath.length);
 
       onUpdateItems(updatedItems);
       setStats({ clusters: result.clusterCount, noise: result.noiseCount });
       
       if (result.linkage) {
           setLinkageData(result.linkage);
+          const itemIds = getAgglomerativeItemIds(activeItems);
+          agglomerativeHierarchyMeta.current = {
+            pathKey: runPathKey,
+            readyItemsKey: runReadyItemsKey,
+            metric: config.metric,
+            normalize: config.normalize,
+            linkage: config.linkage,
+            itemIds
+          };
+      } else {
+          agglomerativeHierarchyMeta.current = null;
       }
       lastRunSignatureByPath.current[runPathKey] = runSignature;
+      clusteredContexts.current.add(`${runPathKey}|${runAlgorithm}`);
       onLog?.(`Clustering complete: ${result.clusterCount} clusters, ${result.noiseCount} noise.`, 'success');
       updateProgress('cluster', 100, 'Clustering complete');
       
@@ -289,17 +336,36 @@ const ClusteringView: React.FC<ClusteringViewProps> = ({ items, onUpdateItems, i
   const handleAutoTune = async () => {
      if (!supportsOptimization(config.algorithm)) return;
      if (readyCount < 5) return;
+     const tuningBaseConfig: ClusteringConfig =
+       config.algorithm === 'AGGLOMERATIVE'
+         ? { ...config, distanceThreshold: DEFAULT_AGGLOMERATIVE_CUT, nClusters: undefined }
+         : config;
+
      setTuningState({ active: true, progress: 0, message: 'Initializing...' });
      const pathLabel = currentPath.length > 0 ? currentPath.join(' > ') : 'root';
      onLog?.(`Smart tune started (${readyCount} items, path: ${pathLabel}).`, 'info');
      updateProgress('tune', 0, 'Initializing...');
+
+     if (config.algorithm === 'AGGLOMERATIVE' && config.distanceThreshold !== DEFAULT_AGGLOMERATIVE_CUT) {
+        setConfig(prev =>
+          prev.algorithm === 'AGGLOMERATIVE'
+            ? { ...prev, distanceThreshold: DEFAULT_AGGLOMERATIVE_CUT, nClusters: undefined }
+            : prev
+        );
+     }
      
      try {
-        const suggestion = await suggestConfig(activeItems, config, (p, msg) => {
+        const suggestion = await suggestConfig(activeItems, tuningBaseConfig, (p, msg) => {
             setTuningState({ active: true, progress: p, message: msg });
             updateProgress('tune', p, msg);
         });
-        setConfig(prev => ({ ...prev, ...suggestion }));
+        setConfig(prev => {
+          const baseline =
+            prev.algorithm === 'AGGLOMERATIVE'
+              ? { ...prev, distanceThreshold: DEFAULT_AGGLOMERATIVE_CUT, nClusters: undefined }
+              : prev;
+          return { ...baseline, ...suggestion };
+        });
         onLog?.(`Smart tune complete: ${summarizeSuggestion(suggestion)}.`, 'success');
         updateProgress('tune', 100, 'Optimization complete');
      } catch(e) {
@@ -355,6 +421,10 @@ const ClusteringView: React.FC<ClusteringViewProps> = ({ items, onUpdateItems, i
   useEffect(() => {
     const pathKey = currentPath.join(',');
     const tuneKey = `${pathKey}|${config.algorithm}`;
+    // Run tuning only after we already have an initial clustering result for this context.
+    if (!clusteredContexts.current.has(tuneKey)) return;
+    if (isProcessing || tuningState.active) return;
+
     if (readyCount >= 5 && !visitedPaths.current.has(tuneKey)) {
         // Debounce slightly to let UI settle
         const timer = setTimeout(() => {
@@ -363,7 +433,7 @@ const ClusteringView: React.FC<ClusteringViewProps> = ({ items, onUpdateItems, i
         }, 50);
         return () => clearTimeout(timer);
     }
-  }, [currentPath, config.algorithm, readyCount]); 
+  }, [currentPath, config.algorithm, readyCount, isProcessing, tuningState.active]); 
 
   // Handles clicking "Drill Down" on a composite group key like "1::2"
   const handleSubCluster = (groupKey: string) => {
@@ -377,6 +447,55 @@ const ClusteringView: React.FC<ClusteringViewProps> = ({ items, onUpdateItems, i
       if (index === -1) switchPath([]);
       else switchPath(recentPath.slice(0, index + 1));
   };
+
+  useEffect(() => {
+    if (config.algorithm !== 'AGGLOMERATIVE') return;
+    if (!linkageData || tuningState.active) return;
+    if (readyCount < 2) return;
+
+    const pathKey = currentPath.join(',');
+    const hierarchyMeta = agglomerativeHierarchyMeta.current;
+    if (!hierarchyMeta) return;
+    if (hierarchyMeta.pathKey !== pathKey) return;
+    if (hierarchyMeta.readyItemsKey !== readyItemsKey) return;
+    if (
+      hierarchyMeta.metric !== config.metric ||
+      hierarchyMeta.normalize !== config.normalize ||
+      hierarchyMeta.linkage !== config.linkage
+    ) return;
+
+    if (lastRunSignatureByPath.current[pathKey] === clusteringSignature) return;
+
+    try {
+      const cutResult = cutAgglomerativeHierarchy(linkageData, hierarchyMeta.itemIds, {
+        nClusters: config.nClusters,
+        distanceThreshold: config.distanceThreshold,
+        minClusterSize: config.minClusterSize
+      });
+      const updatedItems = applyLabelsAtDepth(items, cutResult.labels, currentPath.length);
+      onUpdateItems(updatedItems);
+      setStats({ clusters: cutResult.clusterCount, noise: cutResult.noiseCount });
+      lastRunSignatureByPath.current[pathKey] = clusteringSignature;
+    } catch (error) {
+      console.warn('Fast agglomerative cut failed; falling back to full clustering run.', error);
+    }
+  }, [
+    config.algorithm,
+    config.distanceThreshold,
+    config.linkage,
+    config.metric,
+    config.minClusterSize,
+    config.nClusters,
+    config.normalize,
+    currentPath,
+    items,
+    linkageData,
+    onUpdateItems,
+    readyCount,
+    readyItemsKey,
+    clusteringSignature,
+    tuningState.active
+  ]);
   
   useEffect(() => {
     if (readyCount < 2) return;
@@ -515,6 +634,14 @@ const ClusteringView: React.FC<ClusteringViewProps> = ({ items, onUpdateItems, i
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
+                {tuningState.active && (
+                  <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-300 shrink-0">
+                    <RefreshCw className="w-3 h-3 animate-spin" />
+                    <span className="text-[10px] font-bold uppercase tracking-wide">Background Tune</span>
+                    <span className="text-[10px] font-bold text-amber-200">{tuningState.progress}%</span>
+                  </div>
+                )}
+
                 {/* Compact Actions when Config is Hidden */}
                 {!showConfig && (
                 <div className="flex items-center gap-2 bg-gray-900 border border-gray-800 rounded-lg px-2 py-1 animate-fadeIn">

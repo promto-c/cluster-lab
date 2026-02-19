@@ -363,6 +363,42 @@ export async function suggestConfig(
    return {};
 }
 
+export function cutAgglomerativeHierarchy(
+  linkage: LinkageStep[],
+  itemIdsInOrder: string[],
+  options: { nClusters?: number; distanceThreshold?: number; minClusterSize?: number } = {}
+): Pick<ClusterResult, 'labels' | 'clusterCount' | 'noiseCount'> {
+    const n = itemIdsInOrder.length;
+    if (n === 0) {
+        return { labels: new Map(), clusterCount: 0, noiseCount: 0 };
+    }
+
+    if (linkage.length !== Math.max(0, n - 1)) {
+        throw new Error('Hierarchy size does not match item set.');
+    }
+
+    const effectiveMinSize = options.minClusterSize !== undefined ? options.minClusterSize : 2;
+    let labels = getLabelsFromLinkage(linkage, n, options.nClusters, options.distanceThreshold);
+    labels = applyMinClusterSize(labels, effectiveMinSize);
+
+    const labelMap = new Map<string, number>();
+    let maxLabel = -1;
+    let noiseCount = 0;
+
+    for (let i = 0; i < itemIdsInOrder.length; i++) {
+        const label = labels[i];
+        labelMap.set(itemIdsInOrder[i], label);
+        if (label > maxLabel) maxLabel = label;
+        if (label === -1) noiseCount++;
+    }
+
+    return {
+        labels: labelMap,
+        clusterCount: maxLabel + 1,
+        noiseCount
+    };
+}
+
 // --- Helpers for UI Interaction ---
 
 export function getClusterCountFromThreshold(linkage: LinkageStep[], threshold: number): number {
