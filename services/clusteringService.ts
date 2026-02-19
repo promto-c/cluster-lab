@@ -48,11 +48,22 @@ function generateDataSignature(items: GalleryItem[], normalize: boolean): string
 
 export async function runClustering(
   items: GalleryItem[],
-  config: ClusteringConfig
+  config: ClusteringConfig,
+  onProgress?: (progress: number, msg: string) => void
 ): Promise<ClusterResult> {
+  const reportProgress = async (progress: number, msg: string) => {
+    if (!onProgress) return;
+    onProgress(progress, msg);
+    // Yield so React can paint intermediate progress updates before heavy compute.
+    await new Promise(r => setTimeout(r, 0));
+  };
+
+  await reportProgress(5, 'Preparing vectors...');
+
   // 1. Prepare Data
   const validItems = items.filter(i => i.result && i.result.embedding && i.enabled !== false);
   if (validItems.length === 0) {
+    onProgress?.(100, 'No items to cluster');
     return { labels: new Map(), clusterCount: 0, noiseCount: 0 };
   }
 
@@ -71,12 +82,17 @@ export async function runClustering(
   // Tiny delay to unblock UI
   await new Promise(r => setTimeout(r, 10));
 
+  await reportProgress(20, 'Starting clustering...');
+
   switch (config.algorithm) {
     case 'KMEANS':
+      await reportProgress(45, `Running K-Means (K=${config.k})...`);
       labels = kMeans(vectors, config.k, config.maxIter, distFn);
+      await reportProgress(80, 'Finalizing K-Means assignments...');
       break;
     
     case 'AGGLOMERATIVE': {
+      await reportProgress(30, 'Preparing hierarchy...');
       // Check Cache or Compute Linkage
       let linkage: LinkageStep[];
       
@@ -87,6 +103,7 @@ export async function runClustering(
         cachedLinkage.metric === config.metric &&
         cachedLinkage.linkageType === config.linkage
       ) {
+        await reportProgress(60, 'Using cached hierarchy...');
         linkage = cachedLinkage.steps;
       } else {
         // We might need the distance matrix first
@@ -97,33 +114,42 @@ export async function runClustering(
           cachedDistMatrix.dataSignature === dataSignature &&
           cachedDistMatrix.metric === config.metric
         ) {
+           await reportProgress(45, 'Using cached distance matrix...');
            distMatrix = cachedDistMatrix.matrix;
         } else {
+           await reportProgress(45, 'Computing distance matrix...');
            distMatrix = computeDistanceMatrix(vectors, distFn);
            cachedDistMatrix = { dataSignature, matrix: distMatrix, size: vectors.length, metric: config.metric };
         }
 
+        await reportProgress(70, 'Building hierarchy...');
         linkage = computeLinkageMatrix(distMatrix, vectors.length, config.linkage);
         cachedLinkage = { dataSignature, steps: linkage, linkageType: config.linkage, metric: config.metric };
       }
 
       linkageOut = linkage;
       // Cut the tree
+      await reportProgress(85, 'Applying cut threshold...');
       labels = getLabelsFromLinkage(linkage, vectors.length, config.nClusters, config.distanceThreshold);
       break;
     }
 
     case 'HDBSCAN':
+      await reportProgress(45, 'Running density clustering...');
       labels = dbscan(vectors, config.minSamples, config.epsilon, distFn, config.minClusterSize); 
+      await reportProgress(80, 'Finalizing density clusters...');
       break;
       
     case 'BIRCH':
+      await reportProgress(45, 'Running BIRCH clustering...');
       labels = birchClustering(vectors, config.birchThreshold, config.birchBranching, config.nClusters, distFn);
+      await reportProgress(80, 'Finalizing BIRCH clusters...');
       break;
   }
 
   // --- Post-Process: Enforce Min Cluster Size (Global) ---
   // Any cluster with fewer items than minClusterSize (default 2) is marked as noise (-1).
+  await reportProgress(90, 'Applying minimum cluster size...');
   const effectiveMinSize = config.minClusterSize !== undefined ? config.minClusterSize : 2;
   labels = applyMinClusterSize(labels, effectiveMinSize);
 
@@ -139,6 +165,7 @@ export async function runClustering(
     if (label === -1) noiseCount++;
   });
 
+  onProgress?.(100, 'Clustering complete');
   return {
     labels: labelMap,
     clusterCount: maxLabel + 1,

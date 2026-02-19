@@ -584,6 +584,7 @@ const App: React.FC = () => {
               onUpdateItems={setGalleryImages}
               isProcessing={status === 'clustering'}
               setIsProcessing={(val) => setStatus(val ? 'clustering' : 'ready')}
+              onLog={addLog}
             />
           )}
         </div>
