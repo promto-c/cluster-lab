@@ -4,7 +4,7 @@ import { runClustering, suggestConfig, getClusterCountFromThreshold, getThreshol
 import Dendrogram from './Dendrogram';
 import Gallery from './Gallery';
 import DraggableNumberInput from './DraggableNumberInput';
-import { Settings2, Play, RefreshCw, Layers, BrainCircuit, AlertCircle, Zap, ZapOff, Wand2, HelpCircle, Scale, ChevronUp, ChevronDown, SlidersHorizontal, Activity, Network, ChevronRight, Home, MousePointerClick, RotateCcw } from 'lucide-react';
+import { RefreshCw, Layers, AlertCircle, HelpCircle, Scale, ChevronUp, ChevronDown, SlidersHorizontal, Activity, Network, ChevronRight, Home, RotateCcw } from 'lucide-react';
 
 interface ClusteringViewProps {
   items: GalleryItem[];
@@ -136,9 +136,6 @@ const ClusteringView: React.FC<ClusteringViewProps> = ({ items, onUpdateItems, i
   // Dummy selection state for Gallery
   const [selectedGalleryId, setSelectedGalleryId] = useState<string | null>(null);
   
-  const [autoRun, setAutoRun] = useState(true);
-  const [smartTune, setSmartTune] = useState(true); // New state for auto-tuning on drill down
-
   const [tuningState, setTuningState] = useState<{ active: boolean, progress: number, message: string }>({
     active: false, progress: 0, message: ''
   });
@@ -160,6 +157,9 @@ const ClusteringView: React.FC<ClusteringViewProps> = ({ items, onUpdateItems, i
     if (suggestion.minClusterSize !== undefined) parts.push(`minClusterSize=${suggestion.minClusterSize}`);
     return parts.length > 0 ? parts.join(', ') : 'no parameter changes';
   };
+
+  const supportsOptimization = (algorithm: ClusteringAlgorithm) =>
+    algorithm === 'AGGLOMERATIVE' || algorithm === 'KMEANS' || algorithm === 'HDBSCAN';
   
   // Filter items based on current path
   const activeItems = useMemo(() => {
@@ -287,6 +287,7 @@ const ClusteringView: React.FC<ClusteringViewProps> = ({ items, onUpdateItems, i
   };
 
   const handleAutoTune = async () => {
+     if (!supportsOptimization(config.algorithm)) return;
      if (readyCount < 5) return;
      setTuningState({ active: true, progress: 0, message: 'Initializing...' });
      const pathLabel = currentPath.length > 0 ? currentPath.join(' > ') : 'root';
@@ -310,20 +311,59 @@ const ClusteringView: React.FC<ClusteringViewProps> = ({ items, onUpdateItems, i
      }
   };
 
-  // Trigger Smart Tune when path changes (drilling down)
-  // Logic: Only run auto-tune if this path hasn't been auto-tuned in this session.
-  // This preserves manual overrides if the user navigates away and back.
+  const handleResetDefaults = async () => {
+    const baseConfig: ClusteringConfig = { ...defaultConfig, algorithm: config.algorithm };
+    const pathLabel = currentPath.length > 0 ? currentPath.join(' > ') : 'root';
+
+    if (!supportsOptimization(baseConfig.algorithm)) {
+      setConfig(baseConfig);
+      onLog?.(`Defaults restored (${baseConfig.algorithm}). Optimization is not supported for this algorithm.`, 'info');
+      return;
+    }
+
+    if (readyCount < 5) {
+      setConfig(baseConfig);
+      onLog?.(`Defaults restored (${baseConfig.algorithm}). Need at least 5 items to optimize.`, 'info');
+      return;
+    }
+
+    setTuningState({ active: true, progress: 0, message: 'Resetting defaults...' });
+    onLog?.(`Reset + optimize started (${readyCount} items, path: ${pathLabel}, algo: ${baseConfig.algorithm}).`, 'info');
+    updateProgress('tune', 0, 'Resetting defaults...');
+
+    try {
+      const suggestion = await suggestConfig(activeItems, baseConfig, (p, msg) => {
+        setTuningState({ active: true, progress: p, message: msg });
+        updateProgress('tune', p, msg);
+      });
+
+      setConfig({ ...baseConfig, ...suggestion });
+      onLog?.(`Reset + optimize complete: ${summarizeSuggestion(suggestion)}.`, 'success');
+      updateProgress('tune', 100, 'Reset and optimization complete');
+    } catch (e) {
+      console.error('Reset defaults optimization failed', e);
+      setConfig(baseConfig);
+      onLog?.(`Optimization failed; restored defaults (${baseConfig.algorithm}).`, 'error');
+    } finally {
+      onProgressUpdate?.(null);
+      setTuningState(prev => ({ ...prev, active: false }));
+    }
+  };
+
+  // Trigger Smart Tune when path/algorithm context changes.
+  // Only run once per path+algorithm in this session to preserve manual overrides.
   useEffect(() => {
     const pathKey = currentPath.join(',');
-    if (smartTune && readyCount >= 5 && !visitedPaths.current.has(pathKey)) {
+    const tuneKey = `${pathKey}|${config.algorithm}`;
+    if (readyCount >= 5 && !visitedPaths.current.has(tuneKey)) {
         // Debounce slightly to let UI settle
         const timer = setTimeout(() => {
             handleAutoTune();
-            visitedPaths.current.add(pathKey);
+            visitedPaths.current.add(tuneKey);
         }, 50);
         return () => clearTimeout(timer);
     }
-  }, [currentPath, smartTune, readyCount]); 
+  }, [currentPath, config.algorithm, readyCount]); 
 
   // Handles clicking "Drill Down" on a composite group key like "1::2"
   const handleSubCluster = (groupKey: string) => {
@@ -339,7 +379,6 @@ const ClusteringView: React.FC<ClusteringViewProps> = ({ items, onUpdateItems, i
   };
   
   useEffect(() => {
-    if (!autoRun) return;
     if (readyCount < 2) return;
     // Don't auto-run if tuning is in progress; wait for it to finish and update config
     if (tuningState.active) return; 
@@ -351,7 +390,7 @@ const ClusteringView: React.FC<ClusteringViewProps> = ({ items, onUpdateItems, i
     }, 300); // Shorter debounce for slider responsiveness
 
     return () => clearTimeout(handler);
-  }, [autoRun, readyCount, tuningState.active, currentPath, clusteringSignature]);
+  }, [readyCount, tuningState.active, currentPath, clusteringSignature]);
 
   // --- Render Logic for Group Titles ---
   const renderGroupTitle = (val: string, count: number) => {
@@ -556,36 +595,6 @@ const ClusteringView: React.FC<ClusteringViewProps> = ({ items, onUpdateItems, i
                         </>
                     )}
                     
-                    {(!autoRun || !smartTune) && <div className="w-px h-4 bg-gray-700 mx-1"></div>}
-
-                    {/* Compact Auto-Tune Button */}
-                    {!smartTune && (
-                    <button 
-                        onClick={handleAutoTune}
-                        disabled={readyCount < 5 || tuningState.active}
-                        className="flex items-center gap-1.5 px-2 py-1 bg-gray-800 hover:bg-gray-700 text-accent-400 border border-gray-700 hover:border-accent-500/50 rounded transition-colors shadow-sm disabled:opacity-50"
-                        title="Optimize Parameters"
-                    >
-                        {tuningState.active ? (
-                            <RefreshCw className="w-3 h-3 animate-spin" />
-                        ) : (
-                            <Wand2 className="w-3 h-3" />
-                        )}
-                        <span className="hidden xl:inline text-xs font-bold">Optimize</span>
-                    </button>
-                    )}
-
-                    {!autoRun && (
-                    <button 
-                        onClick={handleRunClustering}
-                        disabled={isProcessing}
-                        className="flex items-center gap-1.5 px-2 py-1 bg-green-600 hover:bg-green-500 text-white rounded transition-colors shadow-sm disabled:opacity-50"
-                        title="Run Clustering"
-                    >
-                        {isProcessing ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3 fill-current" />}
-                        <span className="text-xs font-bold">Run</span>
-                    </button>
-                    )}
                 </div>
                 )}
 
@@ -849,121 +858,26 @@ const ClusteringView: React.FC<ClusteringViewProps> = ({ items, onUpdateItems, i
                   </div>
               </div>
 
-              <div className="h-px bg-gray-800"></div>
-
-              {/* Execution Behavior */}
-              <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-gray-500 uppercase flex items-center gap-2">
-                     <Zap className="w-3 h-3" /> Runtime Behavior
-                  </label>
-                  
-                  <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setAutoRun(!autoRun)}
-                        className={`p-2 rounded-lg border text-left transition-colors ${
-                          autoRun
-                            ? 'border-accent-500/30 bg-accent-500/10'
-                            : 'border-gray-800 bg-gray-950/30 hover:border-gray-700'
-                        }`}
-                      >
-                          <div className="flex items-center justify-between gap-2">
-                              <span className="text-xs font-semibold text-gray-300">Auto-Run</span>
-                              <span className={`w-9 h-5 rounded-full p-0.5 transition-colors ${autoRun ? 'bg-accent-600' : 'bg-gray-700'}`}>
-                                  <span className={`block w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${autoRun ? 'translate-x-4' : 'translate-x-0'}`}></span>
-                              </span>
-                          </div>
-                          <p className="text-[10px] text-gray-500 mt-1">Re-cluster on change</p>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setSmartTune(!smartTune)}
-                        className={`p-2 rounded-lg border text-left transition-colors ${
-                          smartTune
-                            ? 'border-accent-500/30 bg-accent-500/10'
-                            : 'border-gray-800 bg-gray-950/30 hover:border-gray-700'
-                        }`}
-                      >
-                          <div className="flex items-center justify-between gap-2">
-                              <span className="text-xs font-semibold text-gray-300">Smart Tune</span>
-                              <span className={`w-9 h-5 rounded-full p-0.5 transition-colors ${smartTune ? 'bg-accent-600' : 'bg-gray-700'}`}>
-                                  <span className={`block w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${smartTune ? 'translate-x-4' : 'translate-x-0'}`}></span>
-                              </span>
-                          </div>
-                          <p className="text-[10px] text-gray-500 mt-1">Auto-optimize drill-down</p>
-                      </button>
-                  </div>
-              </div>
-
               {/* Actions */}
               <div className="flex flex-col gap-3 mt-auto pt-4 border-t border-gray-800">
-                {!smartTune && (
+                <div className="grid gap-3 grid-cols-1">
                     <button 
-                        onClick={handleAutoTune}
-                        disabled={readyCount < 5 || tuningState.active}
-                        className={`flex items-center justify-center gap-2 py-3 rounded-lg border text-xs font-bold transition-all relative overflow-hidden group
-                            ${tuningState.active 
-                                ? 'bg-accent-900/20 border-accent-500/20 text-accent-400 cursor-wait' 
-                                : 'bg-accent-500/10 border-accent-500/30 text-accent-400 hover:bg-accent-500/20 hover:border-accent-500/50'
-                            }
-                        `}
+                        onClick={handleResetDefaults}
+                        disabled={tuningState.active}
+                        className={`flex items-center justify-center gap-2 py-3 px-3 rounded-lg border transition-colors text-xs font-bold group ${
+                          tuningState.active
+                            ? 'border-accent-500/30 bg-accent-500/10 text-accent-300 cursor-wait'
+                            : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:text-white hover:bg-gray-700'
+                        }`}
+                        title="Reset selected algorithm defaults and optimize when supported"
                     >
                         {tuningState.active ? (
-                            <>
-                                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                                <span>{tuningState.progress}%</span>
-                            </>
-                        ) : (
-                            <>
-                                <Wand2 className="w-3.5 h-3.5" />
-                                <span>Optimize Params</span>
-                            </>
-                        )}
-                    </button>
-                )}
-
-                <div className="grid gap-3 grid-cols-2">
-                    <button 
-                        onClick={() => setConfig(defaultConfig)}
-                        className="flex items-center justify-center gap-2 py-3 px-3 rounded-lg border border-gray-700 bg-gray-800/50 text-gray-400 hover:text-white hover:bg-gray-700 transition-colors text-xs font-bold group"
-                        title="Reset all parameters to default"
-                    >
-                        <RotateCcw className="w-3.5 h-3.5 group-hover:-rotate-180 transition-transform duration-500" />
-                        Reset Defaults
-                    </button>
-
-                    {autoRun ? (
-                        <div className="py-3 px-3 rounded-lg border border-dashed border-gray-700 bg-gray-800/30 flex items-center justify-center gap-2 text-xs text-gray-500 select-none">
-                            <Zap className="w-3 h-3 text-accent-500 fill-accent-500/20" />
-                            <span className="font-medium">Auto-Run Active</span>
-                        </div>
-                    ) : (
-                        <button
-                        onClick={handleRunClustering}
-                        disabled={isProcessing || readyCount < 2 || tuningState.active}
-                        className={`flex items-center justify-center gap-2 py-3 px-3 rounded-lg border transition-colors text-xs font-bold group
-                            ${isProcessing || readyCount < 2
-                            ? 'border-gray-700 bg-gray-800 text-gray-600 cursor-not-allowed'
-                            : 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 hover:text-emerald-200'
-                            }`}
-                        >
-                        {isProcessing ? (
                             <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                         ) : (
-                            <Play className="w-3.5 h-3.5 fill-current group-hover:scale-110 transition-transform" />
+                            <RotateCcw className="w-3.5 h-3.5 group-hover:-rotate-180 transition-transform duration-500" />
                         )}
-                        <span>
-                            {isProcessing ? 'Processing...' : 'Run Clustering'}
-                        </span>
-
-                        {currentPath.length > 0 && !isProcessing && (
-                            <span className="text-[9px] bg-black/15 px-1.5 py-0.5 rounded text-emerald-100/80 font-mono uppercase">
-                                Sub
-                            </span>
-                        )}
-                        </button>
-                    )}
+                        {tuningState.active ? `${tuningState.progress}%` : 'Reset'}
+                    </button>
                 </div>
                 
                 {readyCount < 5 && (
