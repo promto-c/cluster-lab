@@ -29,7 +29,7 @@ https://promto-c.github.io/cluster-lab/
 ## Tech Stack
 
 - React 18 + TypeScript + Vite
-- `@xenova/transformers` for in-browser model inference
+- `@huggingface/transformers` for in-browser model inference
 - ONNX Runtime Web (WASM assets in `public/onnxruntime`)
 - Three.js + React Three Fiber for 3D visualization
 

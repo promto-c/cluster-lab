@@ -1,14 +1,16 @@
 
-import { env, AutoProcessor, AutoModel, RawImage } from '@xenova/transformers';
+import { env, AutoProcessor, AutoModel, RawImage } from '@huggingface/transformers';
 import { InferenceResult, PreprocessingConfig } from '../types';
 import { processImageForDisplay } from '../utils/imageProcessing';
 
 // Configure transformers.js to use CDN and cache
 env.allowLocalModels = false;
 env.useBrowserCache = true;
-// Serve ONNX Runtime WASM assets locally for offline use.
-// Place the wasm files under `public/onnxruntime/`.
-env.backends.onnx.wasm.wasmPaths = `${import.meta.env.BASE_URL}onnxruntime/`;
+// Vite dev server blocks importing ESM modules directly from `public/`.
+// Use CDN runtime assets in dev, and self-hosted assets in production builds.
+if (!import.meta.env.DEV) {
+  env.backends.onnx.wasm.wasmPaths = `${import.meta.env.BASE_URL}onnxruntime/`;
+}
 
 // Singleton to hold model instance
 let processor: any = null;
@@ -367,10 +369,12 @@ export async function loadModel(
       progress_callback: createFileDownloadProgressReporter('processor', 'Processor file', onDownloadProgress)
     });
     
+    const dtype = localFiles ? 'fp32' : (quantized ? 'q8' : 'fp32');
+
     // 3. Load Model
     onProgress(`Loading model architecture for ${modelId} (Quantized: ${quantized})...`);
     model = await AutoModel.from_pretrained(modelId, {
-      quantized: localFiles ? false : quantized, // Respect user preference for HF, assume local is verbatim
+      dtype,
       revision,
       progress_callback: createFileDownloadProgressReporter('model', 'Model file', onDownloadProgress)
     });
