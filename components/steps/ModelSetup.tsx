@@ -1,9 +1,19 @@
 
-import React, { useMemo, useEffect, useState, useCallback } from 'react';
+import React, { useMemo, useEffect, useState, useCallback, useRef } from 'react';
 import { ModelConfig, ModelSource, ResizeMethod, PadStyle } from '../../types';
 import { DownloadCloud, Box, FileJson, Check, FolderOpen, ChevronDown, HardDrive, Binary, Palette, Grid, Activity, Maximize, Focus, Layout, ArrowRight, ExternalLink, AlertCircle, FilePlus, Settings, Trash2 } from 'lucide-react';
 import CheckboxCard from '../CheckboxCard';
-import { getModelBrowserCacheStatuses, clearModelBrowserCache, type ModelBrowserCacheStatus, type ModelDownloadProgressEntry } from '../../services/dinoService';
+import SelectDropdown, { type SelectDropdownOption } from '../SelectDropdown';
+import {
+  clearModelBrowserCache,
+  getDefaultRemoteOnnxFileName,
+  getFallbackRemoteOnnxVariants,
+  getModelBrowserCacheStatuses,
+  listRemoteOnnxVariants,
+  type ModelBrowserCacheStatus,
+  type ModelDownloadProgressEntry,
+  type RemoteOnnxVariantOption
+} from '../../services/dinoService';
 
 interface ModelSetupProps {
   config: ModelConfig;
@@ -67,8 +77,53 @@ const CLASSICAL_FEATURE_OPTIONS: Array<{
   },
 ];
 
+interface OnnxVariantDisplayMeta {
+  title: string;
+  subtitle: string;
+  badge: string;
+}
+
+interface ModelRepoDisplayMeta {
+  title: string;
+  subtitle: string;
+  badge?: string;
+}
+
+function getOnnxVariantDisplayMeta(option: RemoteOnnxVariantOption): OnnxVariantDisplayMeta {
+  const label = option.label?.trim() || option.fileName;
+  const prefix = `${option.fileName} - `;
+  const longLabel = label.startsWith(prefix) ? label.slice(prefix.length).trim() : label;
+  const suffixMatch = longLabel.match(/\(([^()]+)\)\s*$/);
+  const shortFromLabel = suffixMatch?.[1]?.trim();
+  const shortFromFile = option.fileName.replace(/\.onnx$/i, '').replace(/^model[_-]?/i, '').trim();
+
+  const title = (suffixMatch ? longLabel.slice(0, suffixMatch.index).trim() : longLabel) || option.fileName;
+  const badge = (shortFromLabel || shortFromFile || 'onnx').trim();
+
+  return {
+    title,
+    subtitle: option.fileName,
+    badge,
+  };
+}
+
+function getModelRepoDisplayMeta(
+  option: { name: string; id: string },
+  isCached: boolean
+): ModelRepoDisplayMeta {
+  return {
+    title: option.name,
+    subtitle: option.id,
+    badge: isCached ? 'cached' : undefined,
+  };
+}
+
 const ModelSetup: React.FC<ModelSetupProps> = ({ config, onConfigChange, onLoadModel, onWorkspaceSelect, status, modelDownloadProgress }) => {
   const isLoading = status === 'loading_model';
+  const latestConfigRef = useRef(config);
+  useEffect(() => {
+    latestConfigRef.current = config;
+  }, [config]);
   
   // Local File Analysis
   const localModelStatus = useMemo(() => {
@@ -112,11 +167,78 @@ const ModelSetup: React.FC<ModelSetupProps> = ({ config, onConfigChange, onLoadM
 
   const allOptions = useMemo(() => MODEL_HIERARCHY.flatMap(g => g.options), []);
   const isCustomId = !allOptions.find(o => o.id === config.repoId);
-  const quantizationEnabled = config.quantized ?? true;
+  const fallbackRemoteVariants = useMemo(() => getFallbackRemoteOnnxVariants(), []);
+  const [remoteOnnxVariants, setRemoteOnnxVariants] = useState<RemoteOnnxVariantOption[]>(fallbackRemoteVariants);
+  const [isLoadingRemoteVariants, setIsLoadingRemoteVariants] = useState(false);
+  const [remoteVariantMessage, setRemoteVariantMessage] = useState<string | null>(null);
+  const selectedRemoteOnnxFile = config.remoteOnnxFile || getDefaultRemoteOnnxFileName(remoteOnnxVariants.map(variant => variant.fileName));
+  const selectedRemoteVariant = remoteOnnxVariants.find(variant => variant.fileName === selectedRemoteOnnxFile) || null;
   const [modelCacheStatus, setModelCacheStatus] = useState<Record<string, ModelBrowserCacheStatus>>({});
   const [isCheckingCache, setIsCheckingCache] = useState(false);
   const [isClearingCache, setIsClearingCache] = useState(false);
   const [cacheMessage, setCacheMessage] = useState<string | null>(null);
+  const isOnnxVariantSelectorDisabled = isLoadingRemoteVariants || remoteOnnxVariants.length === 0;
+
+  useEffect(() => {
+    if (config.source !== ModelSource.HUGGINGFACE) return;
+
+    const repoId = config.repoId.trim();
+    if (!repoId) {
+      const defaultVariant = getDefaultRemoteOnnxFileName(fallbackRemoteVariants.map(variant => variant.fileName));
+      setRemoteOnnxVariants(fallbackRemoteVariants);
+      setRemoteVariantMessage(null);
+      const latestConfig = latestConfigRef.current;
+      if (latestConfig.remoteOnnxFile !== defaultVariant) {
+        onConfigChange({ ...latestConfig, remoteOnnxFile: defaultVariant });
+      }
+      return;
+    }
+
+    let cancelled = false;
+    const loadVariants = async () => {
+      setIsLoadingRemoteVariants(true);
+      setRemoteVariantMessage(null);
+
+      try {
+        const fetchedVariants = await listRemoteOnnxVariants(repoId);
+        if (cancelled) return;
+
+        const nextVariants = fetchedVariants.length > 0 ? fetchedVariants : fallbackRemoteVariants;
+        setRemoteOnnxVariants(nextVariants);
+
+        const nextDefaultVariant = getDefaultRemoteOnnxFileName(nextVariants.map(variant => variant.fileName));
+        const latestConfig = latestConfigRef.current;
+        const hasCurrentVariant = nextVariants.some(variant => variant.fileName === latestConfig.remoteOnnxFile);
+        if (!hasCurrentVariant) {
+          onConfigChange({ ...latestConfig, remoteOnnxFile: nextDefaultVariant });
+        }
+
+        if (fetchedVariants.length === 0) {
+          setRemoteVariantMessage('No ONNX files were found under onnx/. Using fallback variants.');
+        }
+      } catch (error: any) {
+        if (cancelled) return;
+
+        const fallbackDefaultVariant = getDefaultRemoteOnnxFileName(fallbackRemoteVariants.map(variant => variant.fileName));
+        setRemoteOnnxVariants(fallbackRemoteVariants);
+        setRemoteVariantMessage('Could not fetch ONNX variants from the model repo. Using fallback variants.');
+
+        const latestConfig = latestConfigRef.current;
+        if (!fallbackRemoteVariants.some(variant => variant.fileName === latestConfig.remoteOnnxFile)) {
+          onConfigChange({ ...latestConfig, remoteOnnxFile: fallbackDefaultVariant });
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingRemoteVariants(false);
+        }
+      }
+    };
+
+    loadVariants();
+    return () => {
+      cancelled = true;
+    };
+  }, [config.source, config.repoId, fallbackRemoteVariants, onConfigChange]);
 
   const refreshModelCacheStatus = useCallback(async () => {
     const modelIds = [...allOptions.map(option => option.id)];
@@ -126,12 +248,12 @@ const ModelSetup: React.FC<ModelSetupProps> = ({ config, onConfigChange, onLoadM
 
     setIsCheckingCache(true);
     try {
-      const statuses = await getModelBrowserCacheStatuses(modelIds, quantizationEnabled);
+      const statuses = await getModelBrowserCacheStatuses(modelIds, selectedRemoteOnnxFile);
       setModelCacheStatus(prev => ({ ...prev, ...statuses }));
     } finally {
       setIsCheckingCache(false);
     }
-  }, [allOptions, config.repoId, quantizationEnabled]);
+  }, [allOptions, config.repoId, selectedRemoteOnnxFile]);
 
   useEffect(() => {
     if (config.source !== ModelSource.HUGGINGFACE) return;
@@ -146,12 +268,51 @@ const ModelSetup: React.FC<ModelSetupProps> = ({ config, onConfigChange, onLoadM
 
   useEffect(() => {
     setCacheMessage(null);
-  }, [config.repoId, quantizationEnabled]);
+  }, [config.repoId, selectedRemoteOnnxFile]);
 
   const selectedRepoId = config.repoId.trim();
   const selectedCacheStatus = selectedRepoId ? modelCacheStatus[selectedRepoId] : null;
   const canClearSelectedCache = !!(selectedCacheStatus?.cacheAvailable && selectedCacheStatus.totalEntries > 0);
-  const cacheModeLabel = quantizationEnabled ? '8-bit' : 'full precision';
+  const cacheModeLabel = selectedRemoteVariant?.label ?? selectedRemoteOnnxFile;
+  const selectedModelRepoValue = isCustomId ? 'custom' : config.repoId;
+  const modelRepoSelectorOptions = useMemo<SelectDropdownOption[]>(() => {
+    const options: SelectDropdownOption[] = [];
+
+    for (const group of MODEL_HIERARCHY) {
+      for (const option of group.options) {
+        const cacheStatus = modelCacheStatus[option.id];
+        const display = getModelRepoDisplayMeta(option, !!(cacheStatus?.cacheAvailable && cacheStatus?.isFullyCached));
+        options.push({
+          value: option.id,
+          label: display.title,
+          description: display.subtitle,
+          badge: display.badge,
+          groupLabel: group.label,
+        });
+      }
+    }
+
+    options.push({
+      value: 'custom',
+      label: 'Custom HuggingFace ID',
+      description: 'Manually enter any repo ID',
+      badge: 'custom',
+      groupLabel: 'Manual',
+    });
+
+    return options;
+  }, [modelCacheStatus]);
+  const onnxVariantSelectorOptions = useMemo<SelectDropdownOption[]>(() => {
+    return remoteOnnxVariants.map(option => {
+      const display = getOnnxVariantDisplayMeta(option);
+      return {
+        value: option.fileName,
+        label: display.title,
+        description: display.subtitle,
+        badge: display.badge,
+      };
+    });
+  }, [remoteOnnxVariants]);
   const downloadProgressItems = useMemo(() => {
     return [...modelDownloadProgress].sort((a, b) => {
       if (a.stage !== b.stage) return a.stage.localeCompare(b.stage);
@@ -253,49 +414,44 @@ const ModelSetup: React.FC<ModelSetupProps> = ({ config, onConfigChange, onLoadM
             {/* HF Mode */}
             {config.source === ModelSource.HUGGINGFACE && (
               <div className="space-y-6">
-                 <div className="space-y-2">
-                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Model Repository</label>
-                    <div className="flex flex-col sm:flex-row gap-3">
-                      <div className="relative flex-1">
-                        <select 
-                          className="w-full bg-gray-950 border border-gray-700 text-white text-lg rounded-xl px-4 py-3 appearance-none focus:border-accent-500 focus:outline-none transition-colors"
-                          value={isCustomId ? 'custom' : config.repoId}
-                          onChange={(e) => {
-                            if (e.target.value === 'custom') {
-                              onConfigChange({...config, repoId: ''});
-                            } else {
-                              onConfigChange({...config, repoId: e.target.value});
+                 <div className="space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)] gap-3">
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Model Repository</label>
+                        <SelectDropdown
+                          value={selectedModelRepoValue}
+                          options={modelRepoSelectorOptions}
+                          onChange={(nextValue) => {
+                            if (nextValue === 'custom') {
+                              onConfigChange({ ...config, repoId: '' });
+                              return;
                             }
+                            onConfigChange({ ...config, repoId: nextValue });
                           }}
-                        >
-                          {MODEL_HIERARCHY.map(group => (
-                            <optgroup key={group.label} label={group.label}>
-                              {group.options.map(opt => (
-                                <option key={opt.id} value={opt.id}>
-                                  {opt.name}
-                                  {modelCacheStatus[opt.id]?.cacheAvailable && modelCacheStatus[opt.id]?.isFullyCached ? ' (cached)' : ''}
-                                </option>
-                              ))}
-                            </optgroup>
-                          ))}
-                          <option value="custom">Custom HuggingFace ID...</option>
-                        </select>
-                        <ChevronDown className="absolute right-4 top-4 w-5 h-5 text-gray-500 pointer-events-none" />
+                          ariaLabel="Model repository selector"
+                          placeholderLabel="Select model repository"
+                        />
                       </div>
 
-                      <CheckboxCard
-                        checked={quantizationEnabled}
-                        onChange={(checked) => onConfigChange({ ...config, quantized: checked })}
-                        className="px-4 py-2 sm:min-w-[260px]"
-                        contentClassName="flex items-start gap-2 pr-6"
-                      >
-                        <Binary className={`w-4 h-4 mt-0.5 ${quantizationEnabled ? 'text-accent-400' : 'text-gray-500 group-hover:text-gray-400'}`} />
-                        <div>
-                          <span className="block text-sm font-semibold text-gray-200 leading-tight">8-bit Quantization</span>
-                          <span className="block text-[11px] text-gray-500 leading-snug">Smaller download and lower memory use.</span>
-                        </div>
-                      </CheckboxCard>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">ONNX Variant</label>
+                        <SelectDropdown
+                          value={selectedRemoteOnnxFile}
+                          options={onnxVariantSelectorOptions}
+                          onChange={(nextValue) => onConfigChange({ ...config, remoteOnnxFile: nextValue })}
+                          disabled={isOnnxVariantSelectorDisabled}
+                          ariaLabel="ONNX variant selector"
+                          placeholderLabel="Select ONNX variant"
+                          emptyLabel={isLoadingRemoteVariants ? 'Loading ONNX variants...' : 'No ONNX variants available'}
+                        />
+                      </div>
                     </div>
+
+                    <p className="text-[11px] text-gray-500">
+                      {isLoadingRemoteVariants
+                        ? 'Fetching ONNX variants from the model repo...'
+                        : remoteVariantMessage || `Using ${selectedRemoteOnnxFile} for model loading.`}
+                    </p>
 
                     <div className="mt-3 bg-gray-950/50 border border-gray-800 rounded-lg p-3 space-y-3">
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -310,14 +466,15 @@ const ModelSetup: React.FC<ModelSetupProps> = ({ config, onConfigChange, onLoadM
                             type="button"
                             onClick={handleClearSelectedCache}
                             disabled={isClearingCache || isCheckingCache}
-                            className={`inline-flex items-center justify-center gap-2 text-xs font-semibold rounded-lg px-3 py-2 transition-colors
+                            aria-label={isClearingCache ? 'Clearing cached model files' : 'Clear cached model'}
+                            title={isClearingCache ? 'Clearing cached model files...' : 'Clear cached model'}
+                            className={`inline-flex aspect-square items-center justify-center rounded-lg w-8 h-8 transition-colors
                               ${isClearingCache || isCheckingCache
-                                ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
-                                : 'bg-red-500/20 text-red-300 hover:bg-red-500/30 hover:text-red-200'
+                                ? 'bg-transparent text-gray-600 cursor-not-allowed'
+                                : 'bg-transparent text-gray-400 hover:bg-red-500/30 hover:text-red-200'
                               }`}
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            {isClearingCache ? 'Clearing...' : 'Clear Cached Model'}
+                            <Trash2 className={`w-3.5 h-3.5 ${isClearingCache ? 'animate-pulse' : ''}`} />
                           </button>
                         )}
                       </div>

@@ -42,7 +42,7 @@ export interface ModelConfig {
   source: ModelSource;
   repoId: string;
   variant: string; // e.g., 'small', 'base', 'large'
-  quantized: boolean; // Toggle for 8-bit quantization
+  remoteOnnxFile: string; // Selected ONNX filename inside remote onnx/ subfolder
   fileName?: string;
   fileUrl?: string;
   localFiles?: File[]; // Store actual File objects for local loading

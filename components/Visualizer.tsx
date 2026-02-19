@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { Canvas } from '@react-three/fiber';
 import { OrbitControls, useTexture } from '@react-three/drei';
 import * as THREE from 'three';
 import { InferenceResult, VisSettings, ColormapType } from '../types';
@@ -50,6 +50,37 @@ interface VisualizerProps {
   globalPcaSamples?: number[][];
   onBuildGlobalPca?: () => void;
   globalPcaSnapshotAt?: number | null;
+}
+
+interface CanvasErrorBoundaryProps {
+  children: React.ReactNode;
+  fallback: React.ReactNode;
+}
+
+interface CanvasErrorBoundaryState {
+  hasError: boolean;
+}
+
+class CanvasErrorBoundary extends React.Component<CanvasErrorBoundaryProps, CanvasErrorBoundaryState> {
+  constructor(props: CanvasErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(): CanvasErrorBoundaryState {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error) {
+    console.warn('Visualizer render failed:', error.message);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback;
+    }
+    return this.props.children;
+  }
 }
 
 // --- 3D Components ---
@@ -229,37 +260,50 @@ const Visualizer: React.FC<VisualizerProps> = ({
       
       {/* 3D Canvas */}
       <div className="flex-1 w-full h-full cursor-move">
-        <Canvas camera={{ position: [0, 0, Math.max(result?.dimensions.width || 10, result?.dimensions.height || 10) * 1.5], fov: 50 }}>
-          <color attach="background" args={['#09090b']} />
-          <ambientLight intensity={0.7} />
-          <directionalLight position={[10, 10, 10]} intensity={1} />
-          <directionalLight position={[-10, -10, 5]} intensity={0.5} />
-          
-          {result && hasPatches && (
-             <group>
-                <PatchGrid 
-                   result={result} 
-                   settings={settings} 
-                   computedColors={computedData.colors} 
-                />
-                {settings.opacity < 1 && (
-                  <ImagePlane 
-                    src={imageSrc} 
-                    width={result.dimensions.width} 
-                    height={result.dimensions.height}
-                    visible={true}
+        <CanvasErrorBoundary
+          key={`canvas-${imageSrc ?? 'none'}`}
+          fallback={
+            <div className="flex h-full w-full items-center justify-center bg-gray-950/70 px-6 text-center">
+              <div className="max-w-sm">
+                <AlertTriangle className="mx-auto mb-3 h-9 w-9 text-amber-500" />
+                <p className="text-sm font-semibold text-gray-200">Preview unavailable for this file.</p>
+                <p className="mt-2 text-xs text-gray-500">Try PNG, JPEG, WebP, GIF, or BMP images.</p>
+              </div>
+            </div>
+          }
+        >
+          <Canvas camera={{ position: [0, 0, Math.max(result?.dimensions.width || 10, result?.dimensions.height || 10) * 1.5], fov: 50 }}>
+            <color attach="background" args={['#09090b']} />
+            <ambientLight intensity={0.7} />
+            <directionalLight position={[10, 10, 10]} intensity={1} />
+            <directionalLight position={[-10, -10, 5]} intensity={0.5} />
+            
+            {result && hasPatches && (
+               <group>
+                  <PatchGrid 
+                     result={result} 
+                     settings={settings} 
+                     computedColors={computedData.colors} 
                   />
-                )}
-             </group>
-          )}
+                  {settings.opacity < 1 && (
+                    <ImagePlane 
+                      src={imageSrc} 
+                      width={result.dimensions.width} 
+                      height={result.dimensions.height}
+                      visible={true}
+                    />
+                  )}
+               </group>
+            )}
 
-          {/* Fallback if no result or no patches, just show image on a plane */}
-          {(!result || !hasPatches) && (
-             <ImagePlane src={imageSrc} width={20} height={20} visible={true} />
-          )}
+            {/* Fallback if no result or no patches, just show image on a plane */}
+            {(!result || !hasPatches) && (
+               <ImagePlane src={imageSrc} width={20} height={20} visible={true} />
+            )}
 
-          <OrbitControls makeDefault />
-        </Canvas>
+            <OrbitControls makeDefault />
+          </Canvas>
+        </CanvasErrorBoundary>
       </div>
 
       {/* Warning for Missing Patches (Imported Embeddings) */}

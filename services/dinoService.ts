@@ -17,6 +17,30 @@ let processor: any = null;
 let model: any = null;
 let currentModelId: string | null = null;
 const TRANSFORMERS_BROWSER_CACHE = 'transformers-cache';
+const ONNX_SUBFOLDER = 'onnx';
+export const DEFAULT_REMOTE_ONNX_FILE = 'model_q4f16.onnx';
+const FALLBACK_REMOTE_ONNX_FILES = [DEFAULT_REMOTE_ONNX_FILE, 'model_quantized.onnx', 'model.onnx'];
+const REMOTE_ONNX_FILE_LABELS: Record<string, string> = {
+  'model.onnx': 'Full precision (fp32)',
+  'model_quantized.onnx': '8-bit quantized (q8)',
+  'model_fp16.onnx': 'Half precision (fp16)',
+  'model_q4.onnx': '4-bit quantized (q4)',
+  'model_q4f16.onnx': '4-bit quantized with fp16 activations (q4f16)',
+  'model_uint8.onnx': 'Unsigned 8-bit (uint8)',
+  'model_int8.onnx': 'Signed 8-bit (int8)',
+  'model_bnb4.onnx': 'BitsAndBytes 4-bit (bnb4)',
+};
+const preferredOnnxFileOrder = [
+  DEFAULT_REMOTE_ONNX_FILE,
+  'model_bnb4.onnx',
+  'model_q4.onnx',
+  'model_quantized.onnx',
+  'model_int8.onnx',
+  'model_uint8.onnx',
+  'model_fp16.onnx',
+  'model.onnx',
+];
+const fileNameCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 
 // Local File Map for interception
 const localFileMap = new Map<string, string>();
@@ -46,6 +70,20 @@ export interface ModelDownloadProgressEntry {
   done: boolean;
 }
 
+interface HuggingFaceModelFileEntry {
+  rfilename?: string;
+}
+
+interface HuggingFaceModelInfoResponse {
+  siblings?: HuggingFaceModelFileEntry[];
+}
+
+export interface RemoteOnnxVariantOption {
+  fileName: string;
+  path: string;
+  label: string;
+}
+
 function normalizeRemoteHost(): string {
   return env.remoteHost.endsWith('/') ? env.remoteHost : `${env.remoteHost}/`;
 }
@@ -58,11 +96,97 @@ function getRemoteModelResolvePrefix(modelId: string): string {
   return new URL(`${modelId}/resolve/`, normalizeRemoteHost()).toString();
 }
 
-function getRequiredModelFiles(quantized: boolean): string[] {
+function normalizeRemoteOnnxFileName(fileName?: string): string {
+  const fallback = DEFAULT_REMOTE_ONNX_FILE;
+  if (!fileName?.trim()) return fallback;
+  const normalized = fileName.trim().replace(/^onnx\//i, '');
+  return normalized.length > 0 ? normalized : fallback;
+}
+
+function sortRemoteOnnxFileNames(fileNames: string[]): string[] {
+  const deduped = Array.from(new Set(fileNames.map(name => normalizeRemoteOnnxFileName(name))));
+  return deduped.sort((a, b) => {
+    const aIdx = preferredOnnxFileOrder.indexOf(a.toLowerCase());
+    const bIdx = preferredOnnxFileOrder.indexOf(b.toLowerCase());
+    const aRank = aIdx === -1 ? Number.MAX_SAFE_INTEGER : aIdx;
+    const bRank = bIdx === -1 ? Number.MAX_SAFE_INTEGER : bIdx;
+    if (aRank !== bRank) return aRank - bRank;
+    return fileNameCollator.compare(a, b);
+  });
+}
+
+function toRemoteOnnxPath(fileName?: string): string {
+  return `${ONNX_SUBFOLDER}/${normalizeRemoteOnnxFileName(fileName)}`;
+}
+
+function toModelFileName(fileName?: string): string {
+  return normalizeRemoteOnnxFileName(fileName).replace(/\.onnx$/i, '');
+}
+
+export function getRemoteOnnxVariantLabel(fileName: string): string {
+  const normalized = normalizeRemoteOnnxFileName(fileName);
+  const label = REMOTE_ONNX_FILE_LABELS[normalized.toLowerCase()];
+  return label ? `${normalized} - ${label}` : normalized;
+}
+
+export function getFallbackRemoteOnnxVariants(): RemoteOnnxVariantOption[] {
+  return FALLBACK_REMOTE_ONNX_FILES.map(fileName => ({
+    fileName,
+    path: toRemoteOnnxPath(fileName),
+    label: getRemoteOnnxVariantLabel(fileName),
+  }));
+}
+
+export function getDefaultRemoteOnnxFileName(fileNames: string[]): string {
+  const normalizedFiles = sortRemoteOnnxFileNames(fileNames);
+  const normalizedFileMap = new Map(normalizedFiles.map(fileName => [fileName.toLowerCase(), fileName]));
+
+  for (const preferredFile of preferredOnnxFileOrder) {
+    const match = normalizedFileMap.get(preferredFile.toLowerCase());
+    if (match) return match;
+  }
+
+  return normalizedFiles[0] ?? DEFAULT_REMOTE_ONNX_FILE;
+}
+
+export async function listRemoteOnnxVariants(
+  modelId: string,
+  revision: string = 'main'
+): Promise<RemoteOnnxVariantOption[]> {
+  const repoId = modelId.trim();
+  if (!repoId) return [];
+
+  const apiUrl = new URL(`api/models/${repoId}`, normalizeRemoteHost());
+  if (revision && revision !== 'main') {
+    apiUrl.searchParams.set('revision', revision);
+  }
+
+  const response = await fetch(apiUrl.toString());
+  if (!response.ok) {
+    throw new Error(`Failed to read model files (${response.status}).`);
+  }
+
+  const payload = (await response.json()) as HuggingFaceModelInfoResponse;
+  const remoteOnnxFiles = sortRemoteOnnxFileNames(
+    (payload.siblings ?? [])
+      .map(entry => entry.rfilename?.trim() ?? '')
+      .filter(path => path.toLowerCase().startsWith(`${ONNX_SUBFOLDER}/`) && path.toLowerCase().endsWith('.onnx'))
+      .map(path => path.slice(ONNX_SUBFOLDER.length + 1))
+      .filter(path => path.length > 0 && !path.includes('/'))
+  );
+
+  return remoteOnnxFiles.map(fileName => ({
+    fileName,
+    path: toRemoteOnnxPath(fileName),
+    label: getRemoteOnnxVariantLabel(fileName),
+  }));
+}
+
+function getRequiredModelFiles(remoteOnnxFileName: string): string[] {
   return [
     'config.json',
     'preprocessor_config.json',
-    `onnx/model${quantized ? '_quantized' : ''}.onnx`,
+    toRemoteOnnxPath(remoteOnnxFileName),
   ];
 }
 
@@ -78,10 +202,10 @@ async function openBrowserModelCache(): Promise<Cache | null> {
 
 export async function getModelBrowserCacheStatuses(
   modelIds: string[],
-  quantized: boolean = true
+  remoteOnnxFileName: string = DEFAULT_REMOTE_ONNX_FILE
 ): Promise<Record<string, ModelBrowserCacheStatus>> {
   const uniqueModelIds = Array.from(new Set(modelIds.map(id => id.trim()).filter(Boolean)));
-  const requiredFiles = getRequiredModelFiles(quantized);
+  const requiredFiles = getRequiredModelFiles(remoteOnnxFileName);
   const result: Record<string, ModelBrowserCacheStatus> = {};
 
   const cache = await openBrowserModelCache();
@@ -294,12 +418,15 @@ export async function loadModel(
   modelId: string, 
   onProgress: (msg: string) => void, 
   localFiles?: File[],
-  quantized: boolean = true,
+  remoteOnnxFileName: string = DEFAULT_REMOTE_ONNX_FILE,
   localModelFileName?: string,
   onDownloadProgress?: (entry: ModelDownloadProgressEntry) => void
 ) {
+  const selectedRemoteOnnxFile = normalizeRemoteOnnxFileName(remoteOnnxFileName);
+  const modelLoadKey = localFiles ? 'local-model' : `${modelId}::${selectedRemoteOnnxFile}`;
+
   // If loading locally, we use a virtual ID
-  const effectiveModelId = localFiles ? 'local-model' : modelId;
+  const effectiveModelId = localFiles ? 'local-model' : modelLoadKey;
 
   // Force reload if local files are provided (user might have changed folder)
   // Or if switching between remote models
@@ -368,16 +495,21 @@ export async function loadModel(
       revision,
       progress_callback: createFileDownloadProgressReporter('processor', 'Processor file', onDownloadProgress)
     });
-    
-    const dtype = localFiles ? 'fp32' : (quantized ? 'q8' : 'fp32');
+
+    const modelLoadOptions: any = {
+      revision,
+      progress_callback: createFileDownloadProgressReporter('model', 'Model file', onDownloadProgress),
+      dtype: 'fp32',
+    };
+    if (!localFiles) {
+      modelLoadOptions.model_file_name = toModelFileName(selectedRemoteOnnxFile);
+      modelLoadOptions.subfolder = ONNX_SUBFOLDER;
+    }
 
     // 3. Load Model
-    onProgress(`Loading model architecture for ${modelId} (Quantized: ${quantized})...`);
-    model = await AutoModel.from_pretrained(modelId, {
-      dtype,
-      revision,
-      progress_callback: createFileDownloadProgressReporter('model', 'Model file', onDownloadProgress)
-    });
+    const remoteVariantLabel = localFiles ? '' : ` (${selectedRemoteOnnxFile})`;
+    onProgress(`Loading model architecture for ${modelId}${remoteVariantLabel}...`);
+    model = await AutoModel.from_pretrained(modelId, modelLoadOptions);
 
     currentModelId = effectiveModelId;
     
@@ -386,7 +518,8 @@ export async function loadModel(
     if (model.config.num_register_tokens) {
       onProgress(`Model loaded with ${model.config.num_register_tokens} register tokens (DINOv2+Registers/v3).`);
     } else {
-      onProgress(`Model ${effectiveModelId} loaded successfully.`);
+      const loadedModelLabel = localFiles ? effectiveModelId : `${modelId} (${selectedRemoteOnnxFile})`;
+      onProgress(`Model ${loadedModelLabel} loaded successfully.`);
     }
 
   } catch (error: any) {

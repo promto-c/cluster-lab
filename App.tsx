@@ -8,7 +8,7 @@ import EmbeddingStudio from './components/steps/EmbeddingStudio';
 import ClusteringView from './components/ClusteringView';
 
 import { ModelConfig, ModelSource, ProcessingStatus, InferenceResult, LogEntry, GalleryItem, AppStep, ResizeMethod, PadStyle } from './types';
-import { loadModel, runInference as runDinoInference, type ModelDownloadProgressEntry } from './services/dinoService';
+import { DEFAULT_REMOTE_ONNX_FILE, loadModel, runInference as runDinoInference, type ModelDownloadProgressEntry } from './services/dinoService';
 import { runClassicalInference } from './services/classicalService';
 import { generateThumbnail } from './utils/imageProcessing';
 import { Terminal, ChevronUp, ChevronDown, Trash2 } from 'lucide-react';
@@ -23,7 +23,7 @@ const App: React.FC = () => {
     repoId: 'Xenova/dinov2-small',
     variant: 'v2-small',
     localFiles: [],
-    quantized: true,
+    remoteOnnxFile: DEFAULT_REMOTE_ONNX_FILE,
     classical: {
       colorHistogram: true,
       lbp: false,
@@ -262,7 +262,7 @@ const App: React.FC = () => {
         config.repoId,
         (msg) => addLog(msg, 'info'),
         filesToLoad,
-        config.quantized,
+        config.remoteOnnxFile,
         config.fileName,
         upsertModelDownloadProgress
       );
@@ -310,8 +310,9 @@ const App: React.FC = () => {
          setStatus('ready');
          return null;
        }
-       setStatus('error');
-       addLog(e.message, 'error');
+       setStatus('ready');
+       const message = typeof e?.message === 'string' ? e.message : 'Inference failed.';
+       addLog(`Failed to process ${file.name}: ${message}`, 'error');
        return null;
      }
   };
@@ -414,7 +415,13 @@ const App: React.FC = () => {
 
   // Auto-run inference when selecting an item that hasn't been processed
   useEffect(() => {
-    if (currentStep === AppStep.EMBED && status === 'ready' && selectedItem && !selectedItem.result) {
+    if (
+      currentStep === AppStep.EMBED &&
+      status === 'ready' &&
+      selectedItem &&
+      !selectedItem.result &&
+      selectedItem.status !== 'error'
+    ) {
         if (selectedItem.enabled === false) return; // Don't run disabled
         if (
           singleRunTargetIdRef.current === selectedItem.id &&
@@ -445,8 +452,14 @@ const App: React.FC = () => {
 
         const run = async () => {
            const res = await runSingle(selectedItem.file, controller.signal);
-           if (!controller.signal.aborted && res) {
-             setGalleryImages(prev => prev.map(img => img.id === targetId ? { ...img, status: 'cached', result: res } : img));
+           if (!controller.signal.aborted) {
+             setGalleryImages(prev => prev.map(img => {
+               if (img.id !== targetId) return img;
+               if (res) {
+                 return { ...img, status: 'cached', result: res };
+               }
+               return { ...img, status: 'error' };
+             }));
            }
            if (activeRunControllerRef.current === controller) {
              activeRunControllerRef.current = null;
