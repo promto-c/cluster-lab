@@ -3,7 +3,7 @@ import { GalleryItem, ClusteringConfig, ClusteringAlgorithm, DistanceMetric, Lin
 import { runClustering, suggestConfig, getClusterCountFromThreshold, getThresholdForClusterCount, cutAgglomerativeHierarchy } from '../services/clusteringService';
 import Dendrogram from './Dendrogram';
 import Gallery from './Gallery';
-import DraggableNumberInput from './DraggableNumberInput';
+import DraggableNumberInput, { DraggableNumberInputProps } from './DraggableNumberInput';
 import { RefreshCw, Layers, AlertCircle, HelpCircle, Scale, ChevronUp, ChevronDown, SlidersHorizontal, Activity, Network, ChevronRight, Home, RotateCcw } from 'lucide-react';
 import useMediaQuery from '../utils/useMediaQuery';
 
@@ -115,6 +115,364 @@ const BreadcrumbSeparator: React.FC<{
             )}
         </div>
     );
+};
+
+interface LabeledNumberControlProps {
+  label: string;
+  inputProps: DraggableNumberInputProps;
+  labelElement?: 'label' | 'span';
+  containerClassName?: string;
+  labelClassName?: string;
+  controlWrapperClassName?: string;
+  overlay?: React.ReactNode;
+}
+
+type NumberControlDescriptor = {
+  key: string;
+  label: string;
+  inputProps: DraggableNumberInputProps;
+  controlWrapperClassName?: string;
+  overlay?: React.ReactNode;
+};
+
+interface AlgorithmQuickControlsProps {
+  config: ClusteringConfig;
+  projectedK: number | null;
+  linkageData: LinkageStep[] | null;
+  onConfigChange: (nextConfig: ClusteringConfig) => void;
+  onClusterCountChange: (newK: number) => void;
+}
+
+interface AlgorithmParameterGridProps {
+  config: ClusteringConfig;
+  projectedK: number | null;
+  linkageData: LinkageStep[] | null;
+  onConfigChange: (nextConfig: ClusteringConfig) => void;
+  onClusterCountChange: (newK: number) => void;
+}
+
+const LabeledNumberControl: React.FC<LabeledNumberControlProps> = ({
+  label,
+  inputProps,
+  labelElement = 'label',
+  containerClassName = 'space-y-1',
+  labelClassName = 'text-[10px] font-bold text-gray-500 uppercase',
+  controlWrapperClassName,
+  overlay
+}) => {
+  const LabelTag = labelElement;
+  const control = <DraggableNumberInput {...inputProps} />;
+
+  return (
+    <div className={containerClassName}>
+      <LabelTag className={labelClassName}>{label}</LabelTag>
+      {controlWrapperClassName || overlay ? (
+        <div className={controlWrapperClassName}>
+          {control}
+          {overlay}
+        </div>
+      ) : (
+        control
+      )}
+    </div>
+  );
+};
+
+const AlgorithmQuickControls: React.FC<AlgorithmQuickControlsProps> = ({
+  config,
+  projectedK,
+  linkageData,
+  onConfigChange,
+  onClusterCountChange
+}) => {
+  const controls: NumberControlDescriptor[] = [];
+
+  if (config.algorithm === 'KMEANS') {
+    controls.push({
+      key: 'quick-kmeans-k',
+      label: 'K',
+      inputProps: {
+        value: config.k,
+        onChange: next => onConfigChange({ ...config, k: next }),
+        min: 2,
+        step: 1,
+        integer: true,
+        className: 'w-[4.5rem]',
+        inputClassName: 'px-1.5 py-0.5 text-xs text-center',
+        handleClassName: 'w-5',
+        ariaLabel: 'Number of clusters',
+        title: 'Number of clusters'
+      }
+    });
+  }
+
+  if (config.algorithm === 'HDBSCAN') {
+    controls.push({
+      key: 'quick-hdbscan-min-cluster-size',
+      label: 'Min Size',
+      inputProps: {
+        value: config.minClusterSize,
+        onChange: next => onConfigChange({ ...config, minClusterSize: next }),
+        min: 2,
+        step: 1,
+        integer: true,
+        className: 'w-[4.5rem]',
+        inputClassName: 'px-1.5 py-0.5 text-xs text-center',
+        handleClassName: 'w-5',
+        ariaLabel: 'Minimum cluster size',
+        title: 'Minimum cluster size'
+      }
+    });
+  }
+
+  if (config.algorithm === 'AGGLOMERATIVE') {
+    controls.push(
+      {
+        key: 'quick-agglomerative-distance-threshold',
+        label: 'Cut Dist',
+        inputProps: {
+          value: config.distanceThreshold,
+          onChange: next => onConfigChange({ ...config, distanceThreshold: next, nClusters: undefined }),
+          min: 0,
+          step: 0.05,
+          className: 'w-[5.5rem]',
+          inputClassName: 'px-1.5 py-0.5 text-xs text-center',
+          handleClassName: 'w-5',
+          ariaLabel: 'Distance threshold',
+          title: 'Distance Threshold'
+        }
+      },
+      {
+        key: 'quick-agglomerative-projected-k',
+        label: 'Est. K',
+        controlWrapperClassName: 'relative',
+        overlay: !linkageData ? (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-gray-600 font-bold text-[10px]">?</div>
+        ) : undefined,
+        inputProps: {
+          value: projectedK ?? 1,
+          disabled: !linkageData,
+          onChange: next => onClusterCountChange(next),
+          min: 1,
+          step: 1,
+          integer: true,
+          className: `w-[4.5rem] ${!linkageData ? 'opacity-50' : ''}`,
+          inputClassName: 'px-1.5 py-0.5 text-xs text-center',
+          handleClassName: 'w-5',
+          ariaLabel: 'Estimated cluster count',
+          title: 'Estimated Cluster Count'
+        }
+      }
+    );
+  }
+
+  return (
+    <>
+      {controls.map(control => (
+        <LabeledNumberControl
+          key={control.key}
+          label={control.label}
+          inputProps={control.inputProps}
+          labelElement="span"
+          containerClassName="flex items-center gap-2 shrink-0"
+          labelClassName="text-[10px] font-bold text-gray-500 uppercase"
+          controlWrapperClassName={control.controlWrapperClassName}
+          overlay={control.overlay}
+        />
+      ))}
+    </>
+  );
+};
+
+const AlgorithmParameterGrid: React.FC<AlgorithmParameterGridProps> = ({
+  config,
+  projectedK,
+  linkageData,
+  onConfigChange,
+  onClusterCountChange
+}) => {
+  if (config.algorithm === 'AGGLOMERATIVE') {
+    const controls: NumberControlDescriptor[] = [
+      {
+        key: 'grid-agglomerative-distance-threshold',
+        label: 'Cut Distance',
+        inputProps: {
+          value: config.distanceThreshold,
+          onChange: next => onConfigChange({ ...config, distanceThreshold: next, nClusters: undefined }),
+          min: 0,
+          step: 0.01,
+          className: 'w-full',
+          inputClassName: 'p-2 text-sm',
+          ariaLabel: 'Agglomerative cut distance'
+        }
+      },
+      {
+        key: 'grid-agglomerative-projected-k',
+        label: 'Est. Clusters',
+        controlWrapperClassName: 'relative',
+        overlay: !linkageData ? (
+          <div className="absolute inset-0 flex items-center justify-center text-[10px] text-gray-600 pointer-events-none">
+            Run to calc
+          </div>
+        ) : undefined,
+        inputProps: {
+          value: projectedK ?? 1,
+          disabled: !linkageData,
+          onChange: next => onClusterCountChange(next),
+          min: 1,
+          step: 1,
+          integer: true,
+          className: `w-full ${!linkageData ? 'opacity-50' : ''}`,
+          inputClassName: 'p-2 text-sm',
+          ariaLabel: 'Estimated clusters'
+        }
+      }
+    ];
+
+    return (
+      <>
+        <div className="space-y-1">
+          <label className="text-[10px] font-bold text-gray-500 uppercase">Linkage Method</label>
+          <select
+            value={config.linkage}
+            onChange={(e) => onConfigChange({ ...config, linkage: e.target.value as LinkageMethod })}
+            className="w-full bg-gray-950 border border-gray-700 rounded-lg p-2 text-sm text-gray-300 focus:border-accent-500 outline-none transition-colors"
+          >
+            <option value="AVERAGE">Average</option>
+            <option value="COMPLETE">Complete</option>
+          </select>
+        </div>
+        <div className="col-span-1 sm:col-span-2 grid grid-cols-2 gap-4">
+          {controls.map(control => (
+            <LabeledNumberControl
+              key={control.key}
+              label={control.label}
+              inputProps={control.inputProps}
+              containerClassName="space-y-1"
+              labelClassName="text-[10px] font-bold text-gray-500 uppercase"
+              controlWrapperClassName={control.controlWrapperClassName}
+              overlay={control.overlay}
+            />
+          ))}
+        </div>
+      </>
+    );
+  }
+
+  let controls: NumberControlDescriptor[] = [];
+
+  if (config.algorithm === 'HDBSCAN') {
+    controls = [
+      {
+        key: 'grid-hdbscan-epsilon',
+        label: 'Epsilon (Radius)',
+        inputProps: {
+          value: config.epsilon,
+          onChange: next => onConfigChange({ ...config, epsilon: next }),
+          min: 0,
+          step: 0.05,
+          className: 'w-full',
+          inputClassName: 'p-2 text-sm',
+          ariaLabel: 'HDBSCAN epsilon radius'
+        }
+      },
+      {
+        key: 'grid-hdbscan-min-cluster-size',
+        label: 'Min Cluster Size',
+        inputProps: {
+          value: config.minClusterSize,
+          onChange: next => onConfigChange({ ...config, minClusterSize: next }),
+          min: 2,
+          step: 1,
+          integer: true,
+          className: 'w-full',
+          inputClassName: 'p-2 text-sm',
+          ariaLabel: 'HDBSCAN minimum cluster size'
+        }
+      }
+    ];
+  }
+
+  if (config.algorithm === 'KMEANS') {
+    controls = [
+      {
+        key: 'grid-kmeans-k',
+        label: 'K (Clusters)',
+        inputProps: {
+          value: config.k,
+          onChange: next => onConfigChange({ ...config, k: next }),
+          min: 2,
+          step: 1,
+          integer: true,
+          className: 'w-full',
+          inputClassName: 'p-2 text-sm',
+          ariaLabel: 'K-means clusters'
+        }
+      },
+      {
+        key: 'grid-kmeans-max-iter',
+        label: 'Max Iterations',
+        inputProps: {
+          value: config.maxIter,
+          onChange: next => onConfigChange({ ...config, maxIter: next }),
+          min: 1,
+          step: 1,
+          integer: true,
+          className: 'w-full',
+          inputClassName: 'p-2 text-sm',
+          ariaLabel: 'K-means max iterations'
+        }
+      }
+    ];
+  }
+
+  if (config.algorithm === 'BIRCH') {
+    controls = [
+      {
+        key: 'grid-birch-threshold',
+        label: 'Radius Threshold',
+        inputProps: {
+          value: config.birchThreshold,
+          onChange: next => onConfigChange({ ...config, birchThreshold: next }),
+          min: 0,
+          step: 0.05,
+          className: 'w-full',
+          inputClassName: 'p-2 text-sm',
+          ariaLabel: 'BIRCH radius threshold'
+        }
+      },
+      {
+        key: 'grid-birch-branching',
+        label: 'Branching Factor',
+        inputProps: {
+          value: config.birchBranching,
+          onChange: next => onConfigChange({ ...config, birchBranching: next }),
+          min: 1,
+          step: 1,
+          integer: true,
+          className: 'w-full',
+          inputClassName: 'p-2 text-sm',
+          ariaLabel: 'BIRCH branching factor'
+        }
+      }
+    ];
+  }
+
+  return (
+    <>
+      {controls.map(control => (
+        <LabeledNumberControl
+          key={control.key}
+          label={control.label}
+          inputProps={control.inputProps}
+          containerClassName="space-y-1"
+          labelClassName="text-[10px] font-bold text-gray-500 uppercase"
+          controlWrapperClassName={control.controlWrapperClassName}
+          overlay={control.overlay}
+        />
+      ))}
+    </>
+  );
 };
 
 
@@ -683,83 +1041,13 @@ const ClusteringView: React.FC<ClusteringViewProps> = ({ items, onUpdateItems, i
                 {/* Compact Actions when Config is Hidden */}
                 {!showConfig && (!isMobile || showMobileQuickControls) && (
                 <div className="flex items-center gap-2 bg-gray-900 border border-gray-800 rounded-lg px-2 py-1 animate-fadeIn overflow-x-auto scrollbar-thin w-full md:w-auto">
-                    
-                    {config.algorithm === 'KMEANS' && (
-                        <div className="flex items-center gap-2 shrink-0">
-                            <span className="text-[10px] font-bold text-gray-500 uppercase">K</span>
-                            <DraggableNumberInput
-                                value={config.k}
-                                onChange={(next) => setConfig({ ...config, k: next })}
-                                min={2}
-                                step={1}
-                                integer
-                                className="w-[4.5rem]"
-                                inputClassName="px-1.5 py-0.5 text-xs text-center"
-                                handleClassName="w-5"
-                                ariaLabel="Number of clusters"
-                                title="Number of clusters"
-                            />
-                        </div>
-                    )}
-                    
-                    {config.algorithm === 'HDBSCAN' && (
-                        <div className="flex items-center gap-2 shrink-0">
-                            <span className="text-[10px] font-bold text-gray-500 uppercase">Min Size</span>
-                            <DraggableNumberInput
-                                value={config.minClusterSize}
-                                onChange={(next) => setConfig({ ...config, minClusterSize: next })}
-                                min={2}
-                                step={1}
-                                integer
-                                className="w-[4.5rem]"
-                                inputClassName="px-1.5 py-0.5 text-xs text-center"
-                                handleClassName="w-5"
-                                ariaLabel="Minimum cluster size"
-                                title="Minimum cluster size"
-                            />
-                        </div>
-                    )}
-
-                    {config.algorithm === 'AGGLOMERATIVE' && (
-                        <>
-                        <div className="flex items-center gap-2 shrink-0">
-                            <span className="text-[10px] font-bold text-gray-500 uppercase">Cut Dist</span>
-                            <DraggableNumberInput
-                                value={config.distanceThreshold}
-                                onChange={(next) => setConfig({ ...config, distanceThreshold: next, nClusters: undefined })}
-                                min={0}
-                                step={0.05}
-                                className="w-[5.5rem]"
-                                inputClassName="px-1.5 py-0.5 text-xs text-center"
-                                handleClassName="w-5"
-                                ariaLabel="Distance threshold"
-                                title="Distance Threshold"
-                            />
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                            <span className="text-[10px] font-bold text-gray-500 uppercase">Est. K</span>
-                            <div className="relative">
-                                <DraggableNumberInput
-                                    value={projectedK ?? 1}
-                                    disabled={!linkageData}
-                                    onChange={(next) => handleClusterCountChange(next)}
-                                    min={1}
-                                    step={1}
-                                    integer
-                                    className={`w-[4.5rem] ${!linkageData ? 'opacity-50' : ''}`}
-                                    inputClassName="px-1.5 py-0.5 text-xs text-center"
-                                    handleClassName="w-5"
-                                    ariaLabel="Estimated cluster count"
-                                    title="Estimated Cluster Count"
-                                />
-                                {!linkageData && (
-                                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-gray-600 font-bold text-[10px]">?</div>
-                                )}
-                            </div>
-                        </div>
-                        </>
-                    )}
-                    
+                    <AlgorithmQuickControls
+                      config={config}
+                      projectedK={projectedK}
+                      linkageData={linkageData}
+                      onConfigChange={setConfig}
+                      onClusterCountChange={handleClusterCountChange}
+                    />
                 </div>
                 )}
 
@@ -835,147 +1123,13 @@ const ClusteringView: React.FC<ClusteringViewProps> = ({ items, onUpdateItems, i
 
                 {/* Parameter Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                    {config.algorithm === 'AGGLOMERATIVE' && (
-                        <>
-                            <div className="space-y-1">
-                                <label className="text-[10px] font-bold text-gray-500 uppercase">Linkage Method</label>
-                                <select 
-                                    value={config.linkage} 
-                                    onChange={(e) => setConfig({...config, linkage: e.target.value as LinkageMethod})}
-                                    className="w-full bg-gray-950 border border-gray-700 rounded-lg p-2 text-sm text-gray-300 focus:border-accent-500 outline-none transition-colors"
-                                >
-                                    <option value="AVERAGE">Average</option>
-                                    <option value="COMPLETE">Complete</option>
-                                </select>
-                            </div>
-                            <div className="col-span-1 sm:col-span-2 grid grid-cols-2 gap-4">
-                                <div className="space-y-1">
-                                    <label className="text-[10px] font-bold text-gray-500 uppercase">Cut Distance</label>
-                                    <DraggableNumberInput
-                                        value={config.distanceThreshold}
-                                        onChange={(next) => setConfig({ ...config, distanceThreshold: next, nClusters: undefined })}
-                                        min={0}
-                                        step={0.01}
-                                        className="w-full"
-                                        inputClassName="p-2 text-sm"
-                                        ariaLabel="Agglomerative cut distance"
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-[10px] font-bold text-gray-500 uppercase">Est. Clusters</label>
-                                    <div className="relative">
-                                        <DraggableNumberInput
-                                            value={projectedK ?? 1}
-                                            disabled={!linkageData}
-                                            onChange={(next) => handleClusterCountChange(next)}
-                                            min={1}
-                                            step={1}
-                                            integer
-                                            className={`w-full ${!linkageData ? 'opacity-50' : ''}`}
-                                            inputClassName="p-2 text-sm"
-                                            ariaLabel="Estimated clusters"
-                                        />
-                                        {!linkageData && (
-                                            <div className="absolute inset-0 flex items-center justify-center text-[10px] text-gray-600 pointer-events-none">
-                                                Run to calc
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        </>
-                    )}
-
-                    {config.algorithm === 'HDBSCAN' && (
-                        <>
-                            <div className="space-y-1">
-                                <label className="text-[10px] font-bold text-gray-500 uppercase">Epsilon (Radius)</label>
-                                <DraggableNumberInput
-                                    value={config.epsilon}
-                                    onChange={(next) => setConfig({ ...config, epsilon: next })}
-                                    min={0}
-                                    step={0.05}
-                                    className="w-full"
-                                    inputClassName="p-2 text-sm"
-                                    ariaLabel="HDBSCAN epsilon radius"
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-[10px] font-bold text-gray-500 uppercase">Min Cluster Size</label>
-                                <DraggableNumberInput
-                                    value={config.minClusterSize}
-                                    onChange={(next) => setConfig({ ...config, minClusterSize: next })}
-                                    min={2}
-                                    step={1}
-                                    integer
-                                    className="w-full"
-                                    inputClassName="p-2 text-sm"
-                                    ariaLabel="HDBSCAN minimum cluster size"
-                                />
-                            </div>
-                        </>
-                    )}
-
-                    {config.algorithm === 'KMEANS' && (
-                        <>
-                          <div className="space-y-1">
-                              <label className="text-[10px] font-bold text-gray-500 uppercase">K (Clusters)</label>
-                              <DraggableNumberInput
-                                  value={config.k}
-                                  onChange={(next) => setConfig({ ...config, k: next })}
-                                  min={2}
-                                  step={1}
-                                  integer
-                                  className="w-full"
-                                  inputClassName="p-2 text-sm"
-                                  ariaLabel="K-means clusters"
-                              />
-                          </div>
-                          <div className="space-y-1">
-                              <label className="text-[10px] font-bold text-gray-500 uppercase">Max Iterations</label>
-                              <DraggableNumberInput
-                                  value={config.maxIter}
-                                  onChange={(next) => setConfig({ ...config, maxIter: next })}
-                                  min={1}
-                                  step={1}
-                                  integer
-                                  className="w-full"
-                                  inputClassName="p-2 text-sm"
-                                  ariaLabel="K-means max iterations"
-                              />
-                          </div>
-                      </>
-                    )}
-                    
-                    {config.algorithm === 'BIRCH' && (
-                      <>
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-gray-500 uppercase">Radius Threshold</label>
-                          <DraggableNumberInput
-                              value={config.birchThreshold}
-                              onChange={(next) => setConfig({ ...config, birchThreshold: next })}
-                              min={0}
-                              step={0.05}
-                              className="w-full"
-                              inputClassName="p-2 text-sm"
-                              ariaLabel="BIRCH radius threshold"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-gray-500 uppercase">Branching Factor</label>
-                            <DraggableNumberInput
-                                value={config.birchBranching}
-                                onChange={(next) => setConfig({ ...config, birchBranching: next })}
-                                min={1}
-                                step={1}
-                                integer
-                                className="w-full"
-                                inputClassName="p-2 text-sm"
-                                ariaLabel="BIRCH branching factor"
-                            />
-                        </div>
-                      </>
-                    )}
+                    <AlgorithmParameterGrid
+                      config={config}
+                      projectedK={projectedK}
+                      linkageData={linkageData}
+                      onConfigChange={setConfig}
+                      onClusterCountChange={handleClusterCountChange}
+                    />
                 </div>
             </div>
 
