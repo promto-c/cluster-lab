@@ -1,10 +1,10 @@
 
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { GalleryItem } from '../../types';
 import Gallery from '../Gallery';
-import { Files, FolderUp, ImagePlus, Loader2, Database, ChevronDown, FileJson } from 'lucide-react';
-import { Button, buttonStyles } from '../Button';
+import { Files, FolderUp, ImagePlus, Loader2, Database, ChevronDown, Images } from 'lucide-react';
+import { Button } from '../Button';
 import { generateThumbnail } from '../../utils/imageProcessing';
 
 interface DatasetUploadProps {
@@ -84,6 +84,21 @@ const DatasetUpload: React.FC<DatasetUploadProps> = ({
 }) => {
   const [loadingExample, setLoadingExample] = useState<string | null>(null);
   const [exampleCount, setExampleCount] = useState(12);
+  const filesInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
+  const embeddingsInputRef = useRef<HTMLInputElement>(null);
+
+  const openFilesPicker = () => {
+    filesInputRef.current?.click();
+  };
+
+  const openFolderPicker = () => {
+    folderInputRef.current?.click();
+  };
+
+  const openEmbeddingsPicker = () => {
+    embeddingsInputRef.current?.click();
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -221,24 +236,30 @@ const DatasetUpload: React.FC<DatasetUploadProps> = ({
   return (
     <div className="flex flex-col h-full gap-4">
       {/* Top Controls */}
-      <div className="bg-gray-900 border border-gray-800 p-4 rounded-xl flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4 shrink-0">
-         <div>
-           <h2 className="text-lg font-bold text-white flex items-center gap-2">
-             Curate Dataset
-           </h2>
-           <p className="text-xs text-gray-400">Import images for analysis. Folders are supported.</p>
-         </div>
-         
-         <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-col gap-2 shrink-0">
+         <div className="flex items-center justify-between gap-2 text-xs text-gray-400 bg-gray-950/30 p-2 rounded-lg border border-gray-800/50">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+               <div className="flex items-center gap-2 pr-2 mr-1 border-r border-gray-800/80 shrink-0">
+                  <div className="p-1.5 bg-accent-500/10 rounded-lg">
+                     <Images className="w-4 h-4 text-accent-500" />
+                  </div>
+                  <div className="leading-none">
+                     <h2 className="text-sm font-bold text-white">Curate Dataset</h2>
+                     <p className="text-[10px] text-gray-500 font-medium mt-0.5">Add files, folders, or examples</p>
+                  </div>
+               </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
              {/* Example Loaders */}
-             <div className="flex items-center gap-1 bg-gray-950 p-1 pr-2 rounded-lg border border-gray-800">
+             <div className="flex items-center gap-1 bg-gray-900 border border-gray-800 rounded-lg px-2 py-1">
                 <div className="px-2 text-[10px] text-gray-500 font-bold uppercase tracking-wider flex items-center gap-1 border-r border-gray-800 mr-2 pr-2">
                     <Database className="w-3 h-3" /> 
                     <span className="hidden sm:inline">Examples</span>
                 </div>
                 
                 {/* Count Selector */}
-                <div className="relative mr-1">
+                <div className="relative mr-1 shrink-0">
                    <select 
                       value={exampleCount}
                       onChange={(e) => setExampleCount(Number(e.target.value))}
@@ -258,7 +279,7 @@ const DatasetUpload: React.FC<DatasetUploadProps> = ({
                         disabled={!!loadingExample}
                         variant="default"
                         icon={loadingExample === ds.name ? Loader2 : ImagePlus}
-                        className={loadingExample === ds.name ? "opacity-75" : ""}
+                        className={`${loadingExample === ds.name ? "opacity-75" : ""} px-2 py-1`}
                     >
                         <span className="hidden sm:inline">{ds.name}</span>
                         <span className="sm:hidden">{ds.name.slice(0, 4)}</span>
@@ -266,43 +287,56 @@ const DatasetUpload: React.FC<DatasetUploadProps> = ({
                 ))}
              </div>
 
-             <div className="w-px h-6 bg-gray-800 hidden xl:block mx-1"></div>
+             <div className="w-px h-6 bg-gray-800 mx-1"></div>
 
              {/* Action Buttons */}
              <div className="flex items-center gap-2">
-                <label className="cursor-pointer">
-                   <input type="file" onChange={handleImportEmbeddings} className="hidden" accept=".json" />
-                   <div className={`${buttonStyles.base} ${buttonStyles.variants.default}`}>
-                      <FileJson className="w-3.5 h-3.5 text-accent-400" />
-                      Import JSON
-                   </div>
-                </label>
-
                 <div className="inline-flex items-stretch overflow-hidden rounded-md border border-gray-700 bg-gray-800 text-xs font-medium shadow-sm">
-                   <label className="cursor-pointer group">
-                      <input type="file" onChange={handleFileChange} className="hidden" accept="image/*" multiple />
-                      <div className="flex h-full items-center gap-2 px-3 py-1.5 text-gray-300 transition-colors hover:bg-gray-700 hover:text-white">
+                      <button
+                         type="button"
+                         onClick={openFilesPicker}
+                         className="group flex h-full items-center gap-2 px-3 py-1.5 text-gray-300 transition-colors hover:bg-gray-700 hover:text-white"
+                      >
                          <Files className="w-3.5 h-3.5 text-gray-400 transition-colors group-hover:text-gray-200" />
                          Add Files
-                      </div>
-                   </label>
+                      </button>
 
                    <div className="w-px bg-gray-700" />
 
-                   <label className="cursor-pointer group">
-                      <input
-                         type="file"
-                         {...({ webkitdirectory: "", directory: "" } as any)}
-                         onChange={handleFileChange}
-                         className="hidden"
-                      />
-                      <div className="flex h-full items-center gap-2 px-3 py-1.5 text-gray-300 transition-colors hover:bg-gray-700 hover:text-white">
+                      <button
+                         type="button"
+                         onClick={openFolderPicker}
+                         className="group flex h-full items-center gap-2 px-3 py-1.5 text-gray-300 transition-colors hover:bg-gray-700 hover:text-white"
+                      >
                          <FolderUp className="w-3.5 h-3.5 text-gray-400 transition-colors group-hover:text-gray-200" />
-                         Import Folder
-                      </div>
-                   </label>
+                         Add Folder
+                      </button>
                 </div>
+
+                <input
+                   ref={filesInputRef}
+                   type="file"
+                   onChange={handleFileChange}
+                   className="hidden"
+                   accept="image/*"
+                   multiple
+                />
+                <input
+                   ref={folderInputRef}
+                   type="file"
+                   {...({ webkitdirectory: "", directory: "" } as any)}
+                   onChange={handleFileChange}
+                   className="hidden"
+                />
+                <input
+                   ref={embeddingsInputRef}
+                   type="file"
+                   onChange={handleImportEmbeddings}
+                   className="hidden"
+                   accept=".json"
+                />
              </div>
+            </div>
          </div>
       </div>
 
@@ -318,6 +352,10 @@ const DatasetUpload: React.FC<DatasetUploadProps> = ({
             onUpdateItems={setImages}
             onRunAll={onRunAll}
             onStop={onStopRun}
+            onAddFiles={openFilesPicker}
+            onAddFolder={openFolderPicker}
+            onImportEmbeddings={openEmbeddingsPicker}
+            importEmbeddingsDisabled={images.length === 0 || !!isProcessing}
          />
       </div>
     </div>

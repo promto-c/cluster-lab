@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { GalleryItem } from '../types';
-import { Image as ImageIcon, Folder, Play, CheckCircle, Loader2, AlertCircle, Download, Trash2, CheckSquare, Square, Power, XCircle, Check, Layers, AlertTriangle, HelpCircle, Focus, MinusSquare, ChevronDown, X, Split, Grid, LayoutGrid, Grip } from 'lucide-react';
+import { Image as ImageIcon, Folder, Files, FolderUp, FileJson, Play, CheckCircle, Loader2, AlertCircle, Download, Trash2, CheckSquare, Square, Power, XCircle, Check, Layers, AlertTriangle, HelpCircle, Focus, MinusSquare, ChevronDown, X, Split, Grid, LayoutGrid, Grip } from 'lucide-react';
 import { Button } from './Button';
 
 type Density = 'normal' | 'compact' | 'tiny';
@@ -22,6 +22,10 @@ interface GalleryProps {
   onDrillDown?: (groupId: string) => void;
   defaultDensity?: Density;
   headerMeta?: React.ReactNode;
+  onAddFiles?: () => void;
+  onAddFolder?: () => void;
+  onImportEmbeddings?: () => void;
+  importEmbeddingsDisabled?: boolean;
 }
 
 const DENSITY_CONFIG = {
@@ -168,7 +172,11 @@ const Gallery: React.FC<GalleryProps> = ({
   groupTitleBuilder,
   onDrillDown,
   defaultDensity = 'normal',
-  headerMeta
+  headerMeta,
+  onAddFiles,
+  onAddFolder,
+  onImportEmbeddings,
+  importEmbeddingsDisabled = false
 }) => {
   const [selectedBatch, setSelectedBatch] = useState<Set<string>>(new Set());
   const [showExportMenu, setShowExportMenu] = useState(false);
@@ -390,12 +398,39 @@ const Gallery: React.FC<GalleryProps> = ({
   if (images.length === 0) {
     if (viewMode === 'grid') {
       return (
-        <div className="flex-1 border-2 border-dashed border-gray-800 rounded-xl flex flex-col items-center justify-center text-gray-500 bg-gray-900/30 p-10 transition-colors hover:bg-gray-900/50 hover:border-gray-700">
+        <div className="mx-auto w-full max-w-xl flex-1 border-2 border-dashed border-gray-800 rounded-xl flex flex-col items-center justify-center text-gray-500 bg-gray-900/30 p-10 transition-colors hover:bg-gray-900/50 hover:border-gray-700">
           <Folder className="w-12 h-12 mb-4 opacity-50" />
           <p className="text-lg font-medium text-gray-400">Your dataset is empty</p>
           <span className="text-sm opacity-50 mt-2 text-center max-w-sm">
-            Drag and drop images here, or use the "Upload Folder" button above to get started.
+            Drag and drop images here to get started.
           </span>
+          {(onAddFiles || onAddFolder) && (
+            <div className="mt-5 inline-flex items-stretch overflow-hidden rounded-md border border-gray-700 bg-gray-800 text-xs font-medium shadow-sm">
+              {onAddFiles && (
+                <button
+                  type="button"
+                  onClick={onAddFiles}
+                  className="group flex h-full items-center gap-2 px-3 py-1.5 text-gray-300 transition-colors hover:bg-gray-700 hover:text-white"
+                >
+                  <Files className="w-3.5 h-3.5 text-gray-400 transition-colors group-hover:text-gray-200" />
+                  Add Files
+                </button>
+              )}
+
+              {onAddFiles && onAddFolder && <div className="w-px bg-gray-700" />}
+
+              {onAddFolder && (
+                <button
+                  type="button"
+                  onClick={onAddFolder}
+                  className="group flex h-full items-center gap-2 px-3 py-1.5 text-gray-300 transition-colors hover:bg-gray-700 hover:text-white"
+                >
+                  <FolderUp className="w-3.5 h-3.5 text-gray-400 transition-colors group-hover:text-gray-200" />
+                  Add Folder
+                </button>
+              )}
+            </div>
+          )}
         </div>
       );
     }
@@ -580,6 +615,18 @@ const Gallery: React.FC<GalleryProps> = ({
                 </>
               )}
             </div>
+          )}
+
+          {onImportEmbeddings && (
+            <Button
+              onClick={onImportEmbeddings}
+              disabled={importEmbeddingsDisabled}
+              variant="default"
+              icon={FileJson}
+              title="Import precomputed embeddings from JSON"
+            >
+              Import Embeddings
+            </Button>
           )}
 
           {onRunAll && (
