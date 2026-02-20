@@ -24,6 +24,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentStep, setStep, completedSteps,
         bg-gray-950 border-t md:border-t-0 md:border-r border-gray-800 
         flex flex-row md:flex-col 
         shrink-0 z-50
+        pb-[max(env(safe-area-inset-bottom),0px)] md:pb-0
     ">
       {/* Header - Hidden on Mobile */}
       {!hideBrandHeader && (
@@ -45,7 +46,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentStep, setStep, completedSteps,
       )}
 
       {/* Navigation */}
-      <nav className="flex-1 p-2 md:p-4 flex flex-row md:flex-col justify-around md:justify-start gap-1 md:gap-2 overflow-x-auto md:overflow-y-auto">
+      <nav className="flex-1 p-1.5 sm:p-2 md:p-4 flex flex-row md:flex-col justify-around md:justify-start gap-1 md:gap-2 overflow-x-auto md:overflow-y-auto">
         {STEPS.map((step, index) => {
            const isActive = currentStep === step.id;
            const isCompleted = completedSteps[index];

@@ -6,6 +6,7 @@ import { InferenceResult, VisSettings, ColormapType } from '../types';
 import { computePCA, extractChannel, mapDataToColors, fitPCA, projectPCA, computeChannelRanges, ChannelRange } from '../utils/math';
 import { Maximize2, Image as ImageIcon, Settings2, Box, Grid, AlertTriangle } from 'lucide-react';
 import SliderField from './SliderField';
+import useMediaQuery from '../utils/useMediaQuery';
 
 // Augment JSX namespace to include Three.js elements used by @react-three/fiber
 // We include both global JSX and React.JSX to cover various TS/React version combinations.
@@ -176,6 +177,7 @@ const Visualizer: React.FC<VisualizerProps> = ({
   const EXTRUSION_MAX = 2;
   const EXTRUSION_STEP = 0.005;
   const OPACITY_STEP = 0.005;
+  const isMobile = useMediaQuery('(max-width: 767px)');
 
   const [settings, setSettings] = useState<VisSettings>({
     mode: 'pca',
@@ -186,9 +188,13 @@ const Visualizer: React.FC<VisualizerProps> = ({
     extrusion: 0
   });
 
-  const [showControls, setShowControls] = useState(true);
+  const [showControls, setShowControls] = useState(() => !isMobile);
   const [showPcaInfo, setShowPcaInfo] = useState(false);
   const [useGlobalPca, setUseGlobalPca] = useState(true);
+
+  useEffect(() => {
+    setShowControls(!isMobile);
+  }, [isMobile]);
 
   // Validation: Check if patches exist
   const hasPatches = result && result.patches && result.patches.length > 0;
@@ -320,7 +326,7 @@ const Visualizer: React.FC<VisualizerProps> = ({
 
       {/* Floating Controls Overlay - Responsive Width */}
       {result && hasPatches && (
-        <div className={`absolute top-4 right-2 md:right-4 w-[calc(100%-1rem)] md:w-72 bg-gray-900/90 backdrop-blur-md border border-gray-700 rounded-lg shadow-xl transition-all duration-300 z-30 ${showControls ? 'translate-x-0 opacity-100' : 'translate-x-[110%] opacity-0 pointer-events-none'}`}>
+        <div className={`absolute top-2 md:top-4 left-2 right-2 md:left-auto md:right-4 md:w-72 bg-gray-900/90 backdrop-blur-md border border-gray-700 rounded-lg shadow-xl transition-all duration-300 z-30 ${showControls ? 'translate-y-0 md:translate-x-0 opacity-100' : 'translate-y-2 md:translate-y-0 md:translate-x-[110%] opacity-0 pointer-events-none'}`}>
           <div className="p-3 border-b border-gray-700 flex justify-between items-center">
             <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 flex items-center gap-2">
                <Settings2 className="w-4 h-4" /> Visualization Controls
@@ -330,7 +336,7 @@ const Visualizer: React.FC<VisualizerProps> = ({
             </button>
           </div>
           
-          <div className="p-4 space-y-5 text-xs max-h-[60vh] overflow-y-auto">
+          <div className="p-4 space-y-5 text-xs max-h-[65dvh] md:max-h-[60vh] overflow-y-auto">
              
              {/* Mode Select */}
              <div className="flex bg-gray-800 rounded p-1">

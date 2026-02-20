@@ -83,9 +83,9 @@ const EmbeddingStudio: React.FC<EmbeddingStudioProps> = ({
          />
          
          {!selectedItem && (
-            <div className="absolute top-4 left-4 bg-gray-900/80 backdrop-blur border border-gray-700 p-3 rounded-lg max-w-xs pointer-events-none">
-               <h3 className="text-sm font-bold text-white mb-1">Feature Extraction</h3>
-               <p className="text-xs text-gray-400">
+            <div className="absolute top-2 left-2 md:top-4 md:left-4 bg-gray-900/80 backdrop-blur border border-gray-700 p-2.5 md:p-3 rounded-lg max-w-[15rem] md:max-w-xs pointer-events-none">
+               <h3 className="text-xs md:text-sm font-bold text-white mb-1">Feature Extraction</h3>
+               <p className="text-[11px] md:text-xs text-gray-400">
                  Select an image from the gallery below to visualize its patch embeddings in 3D space, or click "Run Embeddings" to process the entire batch.
                </p>
             </div>

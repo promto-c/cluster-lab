@@ -543,7 +543,7 @@ const App: React.FC = () => {
   // --- Render ---
   return (
     // Responsive Layout: flex-col-reverse on mobile (Sidebar at bottom), flex-row on desktop (Sidebar at left)
-    <div className="flex flex-col-reverse md:flex-row h-screen bg-gray-950 text-gray-100 font-sans overflow-hidden">
+    <div className="flex flex-col-reverse md:flex-row h-dvh min-h-dvh bg-gray-950 text-gray-100 font-sans overflow-hidden">
       
       <Sidebar 
         currentStep={currentStep} 
@@ -552,10 +552,10 @@ const App: React.FC = () => {
         hideBrandHeader={isStandalonePwa}
       />
 
-      <main className="flex-1 flex flex-col min-w-0 h-full relative">
+      <main className="flex-1 flex flex-col min-w-0 min-h-0 h-full relative">
         
         {/* Step Content Area */}
-        <div className="flex-1 p-4 md:p-6 overflow-y-auto overflow-x-hidden scrollbar-thin">
+        <div className="flex-1 p-2 sm:p-3 md:p-6 overflow-y-auto overflow-x-hidden scrollbar-thin">
           {currentStep === AppStep.INITIALIZE && (
             <ModelSetup 
               config={config} 
@@ -611,7 +611,7 @@ const App: React.FC = () => {
         </div>
 
         {/* Logs Panel - Collapsible */}
-        <div className={`relative flex flex-col bg-gray-900 border-t border-gray-800 shrink-0 transition-all duration-300 ease-in-out ${showLogs ? 'h-48' : 'h-9'}`}>
+        <div className={`relative flex flex-col bg-gray-900 border-t border-gray-800 shrink-0 transition-all duration-300 ease-in-out pb-[max(env(safe-area-inset-bottom),0px)] md:pb-0 ${showLogs ? 'h-48' : 'h-9'}`}>
            {!showLogs && logProgress && (
              <div className="absolute left-0 top-0 z-10 h-px w-full bg-gray-800 pointer-events-none">
                <div
@@ -621,7 +621,7 @@ const App: React.FC = () => {
              </div>
            )}
 
-           <div className="px-4 py-2 bg-gray-900 border-b border-gray-800 flex items-center justify-between cursor-pointer hover:bg-gray-800/50" onClick={() => setShowLogs(!showLogs)}>
+           <div className="px-3 sm:px-4 py-2 bg-gray-900 border-b border-gray-800 flex items-center justify-between cursor-pointer hover:bg-gray-800/50" onClick={() => setShowLogs(!showLogs)}>
               <div className="flex items-center gap-2 text-xs font-mono text-gray-500 uppercase overflow-hidden flex-1 mr-4">
                 <Terminal className="w-3 h-3 shrink-0" /> 
                 <span className="shrink-0 font-bold">System Logs</span>

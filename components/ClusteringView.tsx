@@ -5,6 +5,7 @@ import Dendrogram from './Dendrogram';
 import Gallery from './Gallery';
 import DraggableNumberInput from './DraggableNumberInput';
 import { RefreshCw, Layers, AlertCircle, HelpCircle, Scale, ChevronUp, ChevronDown, SlidersHorizontal, Activity, Network, ChevronRight, Home, RotateCcw } from 'lucide-react';
+import useMediaQuery from '../utils/useMediaQuery';
 
 interface ClusteringViewProps {
   items: GalleryItem[];
@@ -55,7 +56,8 @@ const BreadcrumbSeparator: React.FC<{
     parentPath: number[];
     items: GalleryItem[];
     onSelect: (clusterId: number) => void;
-}> = ({ depth, parentPath, items, onSelect }) => {
+    isMobile?: boolean;
+}> = ({ depth, parentPath, items, onSelect, isMobile = false }) => {
     const [isOpen, setIsOpen] = useState(false);
     
     // Find siblings available at this level given the parent path
@@ -78,10 +80,19 @@ const BreadcrumbSeparator: React.FC<{
     if (siblings.length === 0) return <ChevronRight className="w-3 h-3 opacity-30" />;
 
     return (
-        <div className="relative flex items-center" onMouseEnter={() => setIsOpen(true)} onMouseLeave={() => setIsOpen(false)}>
-            <div className={`p-0.5 rounded cursor-pointer transition-colors ${isOpen ? 'bg-accent-500/20 text-accent-400' : 'text-gray-600 hover:text-gray-400'}`}>
+        <div
+            className="relative flex items-center"
+            onMouseEnter={!isMobile ? () => setIsOpen(true) : undefined}
+            onMouseLeave={!isMobile ? () => setIsOpen(false) : undefined}
+        >
+            <button
+                type="button"
+                onClick={() => setIsOpen(prev => !prev)}
+                className={`p-0.5 rounded cursor-pointer transition-colors ${isOpen ? 'bg-accent-500/20 text-accent-400' : 'text-gray-600 hover:text-gray-400'}`}
+                aria-label="Open sibling cluster menu"
+            >
                 <ChevronRight className="w-3 h-3" />
-            </div>
+            </button>
             
             {isOpen && (
                 <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 w-32 bg-gray-900 border border-gray-700 rounded-lg shadow-xl z-50 py-1 animate-in fade-in zoom-in-95 duration-150">
@@ -108,7 +119,9 @@ const BreadcrumbSeparator: React.FC<{
 
 
 const ClusteringView: React.FC<ClusteringViewProps> = ({ items, onUpdateItems, isProcessing, setIsProcessing, onLog, onProgressUpdate }) => {
+  const isMobile = useMediaQuery('(max-width: 767px)');
   const [showConfig, setShowConfig] = useState(false);
+  const [showMobileQuickControls, setShowMobileQuickControls] = useState(false);
   
   // Default Config
   const defaultConfig: ClusteringConfig = {
@@ -175,6 +188,17 @@ const ClusteringView: React.FC<ClusteringViewProps> = ({ items, onUpdateItems, i
   const [tuningState, setTuningState] = useState<{ active: boolean, progress: number, message: string }>({
     active: false, progress: 0, message: ''
   });
+
+  useEffect(() => {
+    if (isMobile) return;
+    setShowMobileQuickControls(false);
+  }, [isMobile]);
+
+  useEffect(() => {
+    if (!showConfig) return;
+    setShowMobileQuickControls(false);
+  }, [showConfig]);
+
   const updateProgress = (mode: 'cluster' | 'tune', value: number, message: string) => {
     onProgressUpdate?.({
       mode,
@@ -574,8 +598,8 @@ const ClusteringView: React.FC<ClusteringViewProps> = ({ items, onUpdateItems, i
       {/* 1. Header & Toolbar */}
       <div className="flex flex-col gap-2 shrink-0">
         {/* Interactive Breadcrumbs */}
-        <div className="flex items-center justify-between gap-2 text-xs text-gray-400 bg-gray-950/30 p-2 rounded-lg border border-gray-800/50">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 text-xs text-gray-400 bg-gray-950/30 p-2 rounded-lg border border-gray-800/50">
+            <div className="w-full md:w-auto flex items-center gap-2 min-w-0 flex-1">
                 <div className="flex items-center gap-2 pr-2 mr-1 border-r border-gray-800/80 shrink-0">
                     <div className="p-1.5 bg-accent-500/10 rounded-lg">
                         <Network className="w-4 h-4 text-accent-500" />
@@ -586,10 +610,10 @@ const ClusteringView: React.FC<ClusteringViewProps> = ({ items, onUpdateItems, i
                     </div>
                 </div>
 
-                <div className="flex items-center gap-1 min-w-0 flex-1 overflow-x-auto scrollbar-thin">
+                <div className="flex items-center gap-1 min-w-0 flex-1 overflow-x-auto scrollbar-thin pb-1 md:pb-0">
                     <button 
                         onClick={() => handleNavigate(-1)}
-                        className={`p-1 rounded-md transition-colors flex items-center gap-1 shrink-0 ${currentPath.length === 0 ? 'bg-accent-500/10 text-accent-400 font-bold' : 'hover:bg-gray-800 hover:text-white'}`}
+                        className={`px-2 py-1 md:px-1.5 md:py-0.5 rounded-md transition-colors flex items-center gap-1 shrink-0 ${currentPath.length === 0 ? 'bg-accent-500/10 text-accent-400 font-bold' : 'hover:bg-gray-800 hover:text-white'}`}
                     >
                         <Home className="w-3 h-3" />
                         Root
@@ -600,6 +624,7 @@ const ClusteringView: React.FC<ClusteringViewProps> = ({ items, onUpdateItems, i
                         parentPath={[]} 
                         items={items}
                         onSelect={(id) => switchPath([id])}
+                        isMobile={isMobile}
                     />
 
                     {recentPath.map((clusterId, idx) => {
@@ -610,7 +635,7 @@ const ClusteringView: React.FC<ClusteringViewProps> = ({ items, onUpdateItems, i
                         <React.Fragment key={idx}>
                             <button 
                                 onClick={() => handleNavigate(idx)}
-                                className={`px-1.5 py-0.5 rounded-md transition-colors flex items-center gap-1 shrink-0
+                                className={`px-2 py-1 md:px-1.5 md:py-0.5 rounded-md transition-colors flex items-center gap-1 shrink-0
                                     ${isActive 
                                         ? (idx === currentPath.length - 1 
                                             ? 'bg-accent-500/10 text-accent-400 font-bold border border-accent-500/20' 
@@ -626,6 +651,7 @@ const ClusteringView: React.FC<ClusteringViewProps> = ({ items, onUpdateItems, i
                                 parentPath={recentPath.slice(0, idx + 1)}
                                 items={items}
                                 onSelect={(id) => switchPath([...recentPath.slice(0, idx + 1), id])}
+                                isMobile={isMobile}
                             />
                         </React.Fragment>
                         );
@@ -633,21 +659,33 @@ const ClusteringView: React.FC<ClusteringViewProps> = ({ items, onUpdateItems, i
                 </div>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="w-full md:w-auto flex items-center justify-between md:justify-end gap-2 shrink-0">
                 {tuningState.active && (
                   <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-300 shrink-0">
                     <RefreshCw className="w-3 h-3 animate-spin" />
-                    <span className="text-[10px] font-bold uppercase tracking-wide">Background Tune</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wide hidden sm:inline">Background Tune</span>
                     <span className="text-[10px] font-bold text-amber-200">{tuningState.progress}%</span>
                   </div>
                 )}
 
+                {isMobile && !showConfig && (
+                  <button
+                    type="button"
+                    onClick={() => setShowMobileQuickControls(prev => !prev)}
+                    className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[11px] font-bold transition-all border shadow-sm shrink-0 bg-gray-900 text-gray-300 border-gray-800 hover:text-white hover:border-gray-700"
+                  >
+                    <SlidersHorizontal className="w-3 h-3" />
+                    {showMobileQuickControls ? 'Hide Quick' : 'Quick Controls'}
+                    <ChevronDown className={`w-3 h-3 opacity-60 transition-transform ${showMobileQuickControls ? 'rotate-180' : ''}`} />
+                  </button>
+                )}
+
                 {/* Compact Actions when Config is Hidden */}
-                {!showConfig && (
-                <div className="flex items-center gap-2 bg-gray-900 border border-gray-800 rounded-lg px-2 py-1 animate-fadeIn">
+                {!showConfig && (!isMobile || showMobileQuickControls) && (
+                <div className="flex items-center gap-2 bg-gray-900 border border-gray-800 rounded-lg px-2 py-1 animate-fadeIn overflow-x-auto scrollbar-thin w-full md:w-auto">
                     
                     {config.algorithm === 'KMEANS' && (
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 shrink-0">
                             <span className="text-[10px] font-bold text-gray-500 uppercase">K</span>
                             <DraggableNumberInput
                                 value={config.k}
@@ -665,7 +703,7 @@ const ClusteringView: React.FC<ClusteringViewProps> = ({ items, onUpdateItems, i
                     )}
                     
                     {config.algorithm === 'HDBSCAN' && (
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 shrink-0">
                             <span className="text-[10px] font-bold text-gray-500 uppercase">Min Size</span>
                             <DraggableNumberInput
                                 value={config.minClusterSize}
@@ -684,7 +722,7 @@ const ClusteringView: React.FC<ClusteringViewProps> = ({ items, onUpdateItems, i
 
                     {config.algorithm === 'AGGLOMERATIVE' && (
                         <>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 shrink-0">
                             <span className="text-[10px] font-bold text-gray-500 uppercase">Cut Dist</span>
                             <DraggableNumberInput
                                 value={config.distanceThreshold}
@@ -698,7 +736,7 @@ const ClusteringView: React.FC<ClusteringViewProps> = ({ items, onUpdateItems, i
                                 title="Distance Threshold"
                             />
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 shrink-0">
                             <span className="text-[10px] font-bold text-gray-500 uppercase">Est. K</span>
                             <div className="relative">
                                 <DraggableNumberInput
@@ -742,16 +780,16 @@ const ClusteringView: React.FC<ClusteringViewProps> = ({ items, onUpdateItems, i
       </div>
 
       {/* 2. Collapsible Configuration Panel */}
-      <div className={`transition-all duration-300 ease-in-out overflow-hidden ${showConfig ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0'}`}>
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 shadow-xl">
+      <div className={`transition-all duration-300 ease-in-out overflow-hidden ${showConfig ? 'max-h-[72dvh] md:max-h-[600px] opacity-100' : 'max-h-0 opacity-0'}`}>
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 shadow-xl max-h-[72dvh] md:max-h-none overflow-y-auto">
           
           {/* Algorithm Selection Tabs */}
-          <div className="flex flex-wrap gap-2 mb-6 border-b border-gray-800 pb-4">
+          <div className="flex flex-nowrap md:flex-wrap gap-2 mb-6 border-b border-gray-800 pb-4 overflow-x-auto scrollbar-thin">
               {(['AGGLOMERATIVE', 'HDBSCAN', 'KMEANS', 'BIRCH'] as ClusteringAlgorithm[]).map(algo => (
                   <button
                       key={algo}
                       onClick={() => setConfig({ ...config, algorithm: algo })}
-                      className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wide transition-all
+                      className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wide transition-all shrink-0
                           ${config.algorithm === algo 
                               ? 'bg-accent-600 text-white shadow-lg shadow-accent-900/20 scale-105' 
                               : 'bg-gray-800 text-gray-500 hover:bg-gray-750 hover:text-gray-300'

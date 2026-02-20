@@ -1,11 +1,13 @@
 
 
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { GalleryItem } from '../../types';
 import Gallery from '../Gallery';
-import { Files, FolderUp, ImagePlus, Loader2, Database, ChevronDown, Images } from 'lucide-react';
+import { ImagePlus, Loader2, Database, ChevronDown, Images } from 'lucide-react';
 import { Button } from '../Button';
 import { generateThumbnail } from '../../utils/imageProcessing';
+import useMediaQuery from '../../utils/useMediaQuery';
+import FileFolderPickerActions from '../FileFolderPickerActions';
 
 interface DatasetUploadProps {
   images: GalleryItem[];
@@ -82,11 +84,18 @@ const DatasetUpload: React.FC<DatasetUploadProps> = ({
   isProcessing,
   onEmbeddingsImported
 }) => {
+  const isMobile = useMediaQuery('(max-width: 767px)');
   const [loadingExample, setLoadingExample] = useState<string | null>(null);
   const [exampleCount, setExampleCount] = useState(12);
+  const [showMobileExamples, setShowMobileExamples] = useState(false);
   const filesInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const embeddingsInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isMobile) return;
+    setShowMobileExamples(false);
+  }, [isMobile]);
 
   const openFilesPicker = () => {
     filesInputRef.current?.click();
@@ -250,93 +259,131 @@ const DatasetUpload: React.FC<DatasetUploadProps> = ({
                </div>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
-             {/* Example Loaders */}
-             <div className="flex items-center gap-1 bg-gray-900 border border-gray-800 rounded-lg px-2 py-1">
-                <div className="px-2 text-[10px] text-gray-500 font-bold uppercase tracking-wider flex items-center gap-1 border-r border-gray-800 mr-2 pr-2">
-                    <Database className="w-3 h-3" /> 
-                    <span className="hidden sm:inline">Examples</span>
-                </div>
-                
-                {/* Count Selector */}
-                <div className="relative mr-1 shrink-0">
-                   <select 
-                      value={exampleCount}
-                      onChange={(e) => setExampleCount(Number(e.target.value))}
-                      className="bg-transparent text-[10px] font-bold text-gray-500 appearance-none pr-3 cursor-pointer focus:outline-none hover:text-white"
-                   >
-                      <option value={4} className="bg-gray-900">4</option>
-                      <option value={8} className="bg-gray-900">8</option>
-                      <option value={12} className="bg-gray-900">12</option>
-                   </select>
-                   <ChevronDown className="w-2 h-2 text-gray-600 absolute right-0 top-1.5 pointer-events-none" />
-                </div>
+            {isMobile ? (
+              <div className="mt-2 flex flex-col gap-2">
+                <FileFolderPickerActions
+                  onAddFiles={openFilesPicker}
+                  onAddFolder={openFolderPicker}
+                />
 
-                {EXAMPLE_DATASETS.map((ds, idx) => (
-                    <Button
+                <button
+                  type="button"
+                  onClick={() => setShowMobileExamples(prev => !prev)}
+                  className="w-full flex items-center justify-between gap-2 rounded-md border border-gray-800 bg-gray-900 px-3 py-2 text-[11px] font-semibold text-gray-300"
+                  aria-expanded={showMobileExamples}
+                >
+                  <span className="inline-flex items-center gap-1.5">
+                    <Database className="w-3.5 h-3.5 text-gray-500" />
+                    Load Example Datasets
+                  </span>
+                  <ChevronDown className={`w-3.5 h-3.5 text-gray-500 transition-transform ${showMobileExamples ? 'rotate-180' : ''}`} />
+                </button>
+
+                {showMobileExamples && (
+                  <div className="bg-gray-900/70 border border-gray-800 rounded-lg p-2 space-y-2 animate-fadeIn">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Sample Count</span>
+                      <div className="relative">
+                        <select
+                          value={exampleCount}
+                          onChange={(e) => setExampleCount(Number(e.target.value))}
+                          className="bg-transparent text-[10px] font-bold text-gray-400 appearance-none pr-4 pl-1 cursor-pointer focus:outline-none hover:text-white"
+                        >
+                          <option value={4} className="bg-gray-900">4</option>
+                          <option value={8} className="bg-gray-900">8</option>
+                          <option value={12} className="bg-gray-900">12</option>
+                        </select>
+                        <ChevronDown className="w-2 h-2 text-gray-600 absolute right-0 top-1.5 pointer-events-none" />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {EXAMPLE_DATASETS.map((ds, idx) => (
+                        <Button
+                          key={ds.name}
+                          onClick={() => loadExample(idx)}
+                          disabled={!!loadingExample}
+                          variant="default"
+                          icon={loadingExample === ds.name ? Loader2 : ImagePlus}
+                          className={`${loadingExample === ds.name ? "opacity-75" : ""} !px-2`}
+                        >
+                          {ds.name}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center justify-between gap-2 mt-1">
+                <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-1 bg-gray-900 border border-gray-800 rounded-lg px-2 py-1">
+                    <div className="px-2 text-[10px] text-gray-500 font-bold uppercase tracking-wider flex items-center gap-1 border-r border-gray-800 mr-2 pr-2">
+                      <Database className="w-3 h-3" />
+                      <span className="hidden sm:inline">Examples</span>
+                    </div>
+
+                    <div className="relative mr-1 shrink-0">
+                      <select
+                        value={exampleCount}
+                        onChange={(e) => setExampleCount(Number(e.target.value))}
+                        className="bg-transparent text-[10px] font-bold text-gray-500 appearance-none pr-3 cursor-pointer focus:outline-none hover:text-white"
+                      >
+                        <option value={4} className="bg-gray-900">4</option>
+                        <option value={8} className="bg-gray-900">8</option>
+                        <option value={12} className="bg-gray-900">12</option>
+                      </select>
+                      <ChevronDown className="w-2 h-2 text-gray-600 absolute right-0 top-1.5 pointer-events-none" />
+                    </div>
+
+                    {EXAMPLE_DATASETS.map((ds, idx) => (
+                      <Button
                         key={ds.name}
                         onClick={() => loadExample(idx)}
                         disabled={!!loadingExample}
                         variant="default"
                         icon={loadingExample === ds.name ? Loader2 : ImagePlus}
                         className={`${loadingExample === ds.name ? "opacity-75" : ""} px-2 py-1`}
-                    >
+                      >
                         <span className="hidden sm:inline">{ds.name}</span>
                         <span className="sm:hidden">{ds.name.slice(0, 4)}</span>
-                    </Button>
-                ))}
-             </div>
+                      </Button>
+                    ))}
+                  </div>
 
-             <div className="w-px h-6 bg-gray-800 mx-1"></div>
+                  <div className="w-px h-6 bg-gray-800 mx-1"></div>
 
-             {/* Action Buttons */}
-             <div className="flex items-center gap-2">
-                <div className="inline-flex items-stretch overflow-hidden rounded-md border border-gray-700 bg-gray-800 text-xs font-medium shadow-sm">
-                      <button
-                         type="button"
-                         onClick={openFilesPicker}
-                         className="group flex h-full items-center gap-2 px-3 py-1.5 text-gray-300 transition-colors hover:bg-gray-700 hover:text-white"
-                      >
-                         <Files className="w-3.5 h-3.5 text-gray-400 transition-colors group-hover:text-gray-200" />
-                         Add Files
-                      </button>
-
-                   <div className="w-px bg-gray-700" />
-
-                      <button
-                         type="button"
-                         onClick={openFolderPicker}
-                         className="group flex h-full items-center gap-2 px-3 py-1.5 text-gray-300 transition-colors hover:bg-gray-700 hover:text-white"
-                      >
-                         <FolderUp className="w-3.5 h-3.5 text-gray-400 transition-colors group-hover:text-gray-200" />
-                         Add Folder
-                      </button>
+                  <div className="flex items-center gap-2">
+                    <FileFolderPickerActions
+                      onAddFiles={openFilesPicker}
+                      onAddFolder={openFolderPicker}
+                    />
+                  </div>
                 </div>
+              </div>
+            )}
 
-                <input
-                   ref={filesInputRef}
-                   type="file"
-                   onChange={handleFileChange}
-                   className="hidden"
-                   accept="image/*"
-                   multiple
-                />
-                <input
-                   ref={folderInputRef}
-                   type="file"
-                   {...({ webkitdirectory: "", directory: "" } as any)}
-                   onChange={handleFileChange}
-                   className="hidden"
-                />
-                <input
-                   ref={embeddingsInputRef}
-                   type="file"
-                   onChange={handleImportEmbeddings}
-                   className="hidden"
-                   accept=".json"
-                />
-             </div>
-            </div>
+            <input
+              ref={filesInputRef}
+              type="file"
+              onChange={handleFileChange}
+              className="hidden"
+              accept="image/*"
+              multiple
+            />
+            <input
+              ref={folderInputRef}
+              type="file"
+              {...({ webkitdirectory: "", directory: "" } as any)}
+              onChange={handleFileChange}
+              className="hidden"
+            />
+            <input
+              ref={embeddingsInputRef}
+              type="file"
+              onChange={handleImportEmbeddings}
+              className="hidden"
+              accept=".json"
+            />
          </div>
       </div>
 

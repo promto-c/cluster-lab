@@ -1,9 +1,10 @@
-
+﻿
 import React, { useMemo, useEffect, useState, useCallback, useRef } from 'react';
 import { ModelConfig, ModelSource, ResizeMethod, PadStyle } from '../../types';
 import { DownloadCloud, Box, FileJson, Check, FolderOpen, ChevronDown, HardDrive, Binary, Palette, Grid, Activity, Maximize, Focus, Layout, ArrowRight, ExternalLink, AlertCircle, FilePlus, Settings, Trash2 } from 'lucide-react';
 import CheckboxCard from '../CheckboxCard';
 import SelectDropdown, { type SelectDropdownOption } from '../SelectDropdown';
+import useMediaQuery from '../../utils/useMediaQuery';
 import {
   clearModelBrowserCache,
   getDefaultRemoteOnnxFileName,
@@ -120,6 +121,9 @@ function getModelRepoDisplayMeta(
 
 const ModelSetup: React.FC<ModelSetupProps> = ({ config, onConfigChange, onLoadModel, onWorkspaceSelect, status, modelDownloadProgress }) => {
   const isLoading = status === 'loading_model';
+  const isMobile = useMediaQuery('(max-width: 767px)');
+  const [showMobileCachePanel, setShowMobileCachePanel] = useState(false);
+  const [showMobilePreprocessPanel, setShowMobilePreprocessPanel] = useState(false);
   const latestConfigRef = useRef(config);
   useEffect(() => {
     latestConfigRef.current = config;
@@ -270,6 +274,12 @@ const ModelSetup: React.FC<ModelSetupProps> = ({ config, onConfigChange, onLoadM
     setCacheMessage(null);
   }, [config.repoId, selectedRemoteOnnxFile]);
 
+  useEffect(() => {
+    if (isMobile) return;
+    setShowMobileCachePanel(false);
+    setShowMobilePreprocessPanel(false);
+  }, [isMobile]);
+
   const selectedRepoId = config.repoId.trim();
   const selectedCacheStatus = selectedRepoId ? modelCacheStatus[selectedRepoId] : null;
   const canClearSelectedCache = !!(selectedCacheStatus?.cacheAvailable && selectedCacheStatus.totalEntries > 0);
@@ -364,9 +374,9 @@ const ModelSetup: React.FC<ModelSetupProps> = ({ config, onConfigChange, onLoadM
 
   return (
     <div className="flex flex-col h-full max-w-2xl mx-auto animate-fadeIn">
-      <div className="text-center mb-6 shrink-0 pt-2">
-        <h2 className="text-3xl font-bold text-white mb-2">Choose Model</h2>
-        <p className="text-gray-400">Initialize a Vision Transformer model (DINOv2) or use Classical Feature Descriptors.</p>
+      <div className="text-center mb-4 md:mb-6 shrink-0 pt-1 md:pt-2 px-1">
+        <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2">Choose Model</h2>
+        <p className="text-sm sm:text-base text-gray-400">Initialize a Vision Transformer model (DINOv2) or use Classical Feature Descriptors.</p>
       </div>
 
       <div className="flex-1 min-h-0 flex flex-col bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden shadow-2xl">
@@ -374,41 +384,44 @@ const ModelSetup: React.FC<ModelSetupProps> = ({ config, onConfigChange, onLoadM
          <div className="flex border-b border-gray-800 overflow-x-auto shrink-0 bg-gray-900 z-10">
             <button 
               onClick={() => onConfigChange({...config, source: ModelSource.HUGGINGFACE})}
-              className={`flex-1 py-4 text-sm font-semibold transition-colors flex items-center justify-center gap-2 whitespace-nowrap px-4
+              className={`flex-1 py-3 md:py-4 text-xs sm:text-sm font-semibold transition-colors flex items-center justify-center gap-1.5 sm:gap-2 whitespace-nowrap px-3 sm:px-4
                 ${config.source === ModelSource.HUGGINGFACE 
                   ? 'bg-gray-800 text-white border-b-2 border-accent-500' 
                   : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800/50'
                 }`}
             >
               <DownloadCloud className="w-4 h-4" />
-              HuggingFace Hub
+              <span className="sm:hidden">Hub</span>
+              <span className="hidden sm:inline">HuggingFace Hub</span>
             </button>
             <button 
               onClick={() => onConfigChange({...config, source: ModelSource.LOCAL})}
-              className={`flex-1 py-4 text-sm font-semibold transition-colors flex items-center justify-center gap-2 whitespace-nowrap px-4
+              className={`flex-1 py-3 md:py-4 text-xs sm:text-sm font-semibold transition-colors flex items-center justify-center gap-1.5 sm:gap-2 whitespace-nowrap px-3 sm:px-4
                 ${config.source === ModelSource.LOCAL 
                   ? 'bg-gray-800 text-white border-b-2 border-accent-500' 
                   : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800/50'
                 }`}
             >
               <HardDrive className="w-4 h-4" />
-              Local Folder
+              <span className="sm:hidden">Local</span>
+              <span className="hidden sm:inline">Local Folder</span>
             </button>
             <button 
               onClick={() => onConfigChange({...config, source: ModelSource.CLASSICAL})}
-              className={`flex-1 py-4 text-sm font-semibold transition-colors flex items-center justify-center gap-2 whitespace-nowrap px-4
+              className={`flex-1 py-3 md:py-4 text-xs sm:text-sm font-semibold transition-colors flex items-center justify-center gap-1.5 sm:gap-2 whitespace-nowrap px-3 sm:px-4
                 ${config.source === ModelSource.CLASSICAL 
                   ? 'bg-gray-800 text-white border-b-2 border-accent-500' 
                   : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800/50'
                 }`}
             >
               <Binary className="w-4 h-4" />
-              Classical Features
+              <span className="sm:hidden">Classic</span>
+              <span className="hidden sm:inline">Classical Features</span>
             </button>
          </div>
 
          {/* Content Area - Scrollable */}
-         <div className="flex-1 overflow-y-auto p-6 md:p-8 scrollbar-thin scrollbar-thumb-gray-700">
+         <div className="flex-1 overflow-y-auto p-4 sm:p-5 md:p-8 scrollbar-thin scrollbar-thumb-gray-700">
             <div className="space-y-6">
             
             {/* HF Mode */}
@@ -453,56 +466,71 @@ const ModelSetup: React.FC<ModelSetupProps> = ({ config, onConfigChange, onLoadM
                         : remoteVariantMessage || `Using ${selectedRemoteOnnxFile} for model loading.`}
                     </p>
 
-                    <div className="mt-3 bg-gray-950/50 border border-gray-800 rounded-lg p-3 space-y-3">
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                        <div>
-                          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Browser Cache</p>
-                          <p className={`text-xs mt-1 ${selectedCacheStatus?.cacheAvailable && selectedCacheStatus.isFullyCached ? 'text-green-400' : 'text-gray-400'}`}>
-                            {cacheStatusText}
-                          </p>
-                        </div>
-                        {canClearSelectedCache && (
-                          <button
-                            type="button"
-                            onClick={handleClearSelectedCache}
-                            disabled={isClearingCache || isCheckingCache}
-                            aria-label={isClearingCache ? 'Clearing cached model files' : 'Clear cached model'}
-                            title={isClearingCache ? 'Clearing cached model files...' : 'Clear cached model'}
-                            className={`inline-flex aspect-square items-center justify-center rounded-lg w-8 h-8 transition-colors
-                              ${isClearingCache || isCheckingCache
-                                ? 'bg-transparent text-gray-600 cursor-not-allowed'
-                                : 'bg-transparent text-gray-400 hover:bg-red-500/30 hover:text-red-200'
-                              }`}
-                          >
-                            <Trash2 className={`w-3.5 h-3.5 ${isClearingCache ? 'animate-pulse' : ''}`} />
-                          </button>
-                        )}
-                      </div>
-                      {cacheMessage && (
-                        <p className="text-[11px] text-gray-500">{cacheMessage}</p>
+                    <div className="mt-3 space-y-2">
+                      {isMobile && (
+                        <button
+                          type="button"
+                          onClick={() => setShowMobileCachePanel(prev => !prev)}
+                          className="w-full flex items-center justify-between gap-2 rounded-lg border border-gray-800 bg-gray-950/40 px-3 py-2 text-left text-xs font-semibold text-gray-300"
+                        >
+                          <span>Browser Cache & Downloads</span>
+                          <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${showMobileCachePanel ? 'rotate-180' : ''}`} />
+                        </button>
                       )}
 
-                      {isLoading && downloadProgressItems.length > 0 && (
-                        <div className="pt-3 border-t border-gray-800/70 space-y-2">
-                          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Downloading Files</p>
-                          {downloadProgressItems.map(item => (
-                            <div key={item.id} className="space-y-1">
-                              <div className="flex items-center justify-between gap-3 text-[11px]">
-                                <span className="text-gray-400 truncate">{item.file}</span>
-                                <span className={item.done ? 'text-green-400' : 'text-gray-400'}>{item.progress}%</span>
-                              </div>
-                              <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
-                                <div
-                                  className={`h-full transition-all duration-150 ${item.done ? 'bg-green-500' : 'bg-accent-500'}`}
-                                  style={{ width: `${Math.max(0, Math.min(100, item.progress))}%` }}
-                                />
-                              </div>
-                              <div className="flex items-center justify-between text-[10px] text-gray-500">
-                                <span>{item.label}</span>
-                                <span>{item.total ? `${formatBytes(item.loaded)} / ${formatBytes(item.total)}` : ''}</span>
-                              </div>
+                      {(!isMobile || showMobileCachePanel) && (
+                        <div className="bg-gray-950/50 border border-gray-800 rounded-lg p-3 space-y-3 animate-fadeIn">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                            <div>
+                              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Browser Cache</p>
+                              <p className={`text-xs mt-1 ${selectedCacheStatus?.cacheAvailable && selectedCacheStatus.isFullyCached ? 'text-green-400' : 'text-gray-400'}`}>
+                                {cacheStatusText}
+                              </p>
                             </div>
-                          ))}
+                            {canClearSelectedCache && (
+                              <button
+                                type="button"
+                                onClick={handleClearSelectedCache}
+                                disabled={isClearingCache || isCheckingCache}
+                                aria-label={isClearingCache ? 'Clearing cached model files' : 'Clear cached model'}
+                                title={isClearingCache ? 'Clearing cached model files...' : 'Clear cached model'}
+                                className={`inline-flex aspect-square items-center justify-center rounded-lg w-8 h-8 transition-colors
+                                  ${isClearingCache || isCheckingCache
+                                    ? 'bg-transparent text-gray-600 cursor-not-allowed'
+                                    : 'bg-transparent text-gray-400 hover:bg-red-500/30 hover:text-red-200'
+                                  }`}
+                              >
+                                <Trash2 className={`w-3.5 h-3.5 ${isClearingCache ? 'animate-pulse' : ''}`} />
+                              </button>
+                            )}
+                          </div>
+                          {cacheMessage && (
+                            <p className="text-[11px] text-gray-500">{cacheMessage}</p>
+                          )}
+
+                          {isLoading && downloadProgressItems.length > 0 && (
+                            <div className="pt-3 border-t border-gray-800/70 space-y-2">
+                              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Downloading Files</p>
+                              {downloadProgressItems.map(item => (
+                                <div key={item.id} className="space-y-1">
+                                  <div className="flex items-center justify-between gap-3 text-[11px]">
+                                    <span className="text-gray-400 truncate">{item.file}</span>
+                                    <span className={item.done ? 'text-green-400' : 'text-gray-400'}>{item.progress}%</span>
+                                  </div>
+                                  <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                                    <div
+                                      className={`h-full transition-all duration-150 ${item.done ? 'bg-green-500' : 'bg-accent-500'}`}
+                                      style={{ width: `${Math.max(0, Math.min(100, item.progress))}%` }}
+                                    />
+                                  </div>
+                                  <div className="flex items-center justify-between text-[10px] text-gray-500">
+                                    <span>{item.label}</span>
+                                    <span>{item.total ? `${formatBytes(item.loaded)} / ${formatBytes(item.total)}` : ''}</span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -585,10 +613,10 @@ const ModelSetup: React.FC<ModelSetupProps> = ({ config, onConfigChange, onLoadM
                       onChange={handleFolderChange}
                       className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                     />
-                    <div className="border-2 border-dashed border-gray-700 rounded-xl p-8 flex flex-col items-center justify-center bg-gray-950/30 group-hover:border-accent-500 group-hover:bg-gray-950/50 transition-all">
+                    <div className="border-2 border-dashed border-gray-700 rounded-xl p-6 sm:p-8 flex flex-col items-center justify-center bg-gray-950/30 group-hover:border-accent-500 group-hover:bg-gray-950/50 transition-all">
                        <FolderOpen className="w-12 h-12 text-gray-600 mb-4 group-hover:text-accent-500 transition-colors" />
-                       <p className="text-lg font-medium text-gray-300">Select Model Folder</p>
-                       <p className="text-sm text-gray-500">
+                       <p className="text-base sm:text-lg font-medium text-gray-300">Select Model Folder</p>
+                       <p className="text-xs sm:text-sm text-gray-500 text-center">
                           Click to select a local folder containing <code className="bg-gray-900 px-1 py-0.5 rounded text-gray-300">model.onnx</code>, <br/>
                           <code className="bg-gray-900 px-1 py-0.5 rounded text-gray-300">config.json</code>, and <code className="bg-gray-900 px-1 py-0.5 rounded text-gray-300">preprocessor_config.json</code>
                        </p>
@@ -696,11 +724,24 @@ const ModelSetup: React.FC<ModelSetupProps> = ({ config, onConfigChange, onLoadM
             
             {/* --- Explicit Preprocessing Configuration --- */}
             {config.source !== ModelSource.CLASSICAL && (
-                <div className="mt-8 pt-6 border-t border-gray-800">
-                    <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
-                        Image Preprocessing Pipeline
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="mt-6 md:mt-8 pt-5 md:pt-6 border-t border-gray-800">
+                    <div className="flex items-center justify-between gap-2 mb-3 md:mb-4">
+                      <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                          Image Preprocessing Pipeline
+                      </h3>
+                      {isMobile && (
+                        <button
+                          type="button"
+                          onClick={() => setShowMobilePreprocessPanel(prev => !prev)}
+                          className="inline-flex items-center gap-1.5 rounded-md border border-gray-700 bg-gray-900 px-2 py-1 text-[11px] font-semibold text-gray-300"
+                        >
+                          {showMobilePreprocessPanel ? 'Hide' : 'Show'}
+                          <ChevronDown className={`w-3 h-3 text-gray-500 transition-transform ${showMobilePreprocessPanel ? 'rotate-180' : ''}`} />
+                        </button>
+                      )}
+                    </div>
+                    {(!isMobile || showMobilePreprocessPanel) && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-fadeIn">
 
                         {/* Option 1: Pad */}
                         <div 
@@ -834,12 +875,13 @@ const ModelSetup: React.FC<ModelSetupProps> = ({ config, onConfigChange, onLoadM
                         </div>
 
                     </div>
+                    )}
                 </div>
             )}
             </div>
          </div>
 
-         <div className="p-6 bg-gray-950/50 border-t border-gray-800 shrink-0 z-10">
+         <div className="p-4 sm:p-5 md:p-6 bg-gray-950/50 border-t border-gray-800 shrink-0 z-10">
             <button
               onClick={onLoadModel}
               disabled={isLoading || (config.source === ModelSource.LOCAL && (!localModelStatus.ready || !localModelStatus.hasConfig || !localModelStatus.hasPreprocessor))}
