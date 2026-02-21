@@ -90,6 +90,96 @@ interface ModelRepoDisplayMeta {
   badge?: string;
 }
 
+interface LocalModelRequirementCardProps {
+  label: string;
+  ready: boolean;
+  icon: React.ComponentType<{ className?: string }>;
+  accept: string;
+  onUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
+}
+
+interface ResizeMethodCardProps {
+  active: boolean;
+  onSelect: () => void;
+  icon: React.ComponentType<{ className?: string }>;
+  iconClassName: string;
+  title: string;
+  description: string;
+  preview: React.ReactNode;
+  details?: React.ReactNode;
+}
+
+const LocalModelRequirementCard: React.FC<LocalModelRequirementCardProps> = ({
+  label,
+  ready,
+  icon: Icon,
+  accept,
+  onUpload
+}) => {
+  if (ready) {
+    return (
+      <div className="p-3 rounded-lg border flex items-center justify-between bg-green-500/10 border-green-500/30">
+        <div className="flex items-center gap-2">
+          <Icon className="w-4 h-4 text-green-400" />
+          <span className="text-sm text-gray-300">{label}</span>
+        </div>
+        <Check className="w-4 h-4 text-green-400" />
+      </div>
+    );
+  }
+
+  return (
+    <label className="p-3 rounded-lg border flex items-center justify-between bg-red-500/10 border-red-500/30 cursor-pointer hover:bg-red-500/20 transition-colors group">
+      <input type="file" accept={accept} className="hidden" onChange={onUpload} />
+      <div className="flex items-center gap-2">
+        <Icon className="w-4 h-4 text-red-400" />
+        <span className="text-sm text-gray-300 group-hover:text-gray-200">{label}</span>
+      </div>
+      <div className="flex items-center justify-center w-7 h-7 rounded-full text-red-300 bg-red-500/20 group-hover:bg-red-500/30 group-hover:text-red-200 transition-colors">
+        <FilePlus className="w-4 h-4" />
+      </div>
+    </label>
+  );
+};
+
+const ResizeMethodCard: React.FC<ResizeMethodCardProps> = ({
+  active,
+  onSelect,
+  icon: Icon,
+  iconClassName,
+  title,
+  description,
+  preview,
+  details
+}) => {
+  return (
+    <div
+      onClick={onSelect}
+      className={`relative cursor-pointer group rounded-xl border p-4 transition-all flex flex-col gap-3
+        ${
+          active
+            ? 'bg-accent-900/10 border-accent-500 ring-1 ring-accent-500/50'
+            : 'bg-gray-950/30 border-gray-800 hover:border-gray-600 hover:bg-gray-900'
+        }
+      `}
+    >
+      {preview}
+      <div>
+        <div className="flex items-center gap-2 font-bold text-sm text-gray-200">
+          <Icon className={`w-4 h-4 ${iconClassName}`} /> {title}
+        </div>
+        <p className="text-[10px] text-gray-500 mt-1 leading-snug">{description}</p>
+      </div>
+      {active && (
+        <div className="absolute top-2 right-2">
+          <Check className="w-4 h-4 text-accent-500" />
+        </div>
+      )}
+      {active && details}
+    </div>
+  );
+};
+
 function getOnnxVariantDisplayMeta(option: RemoteOnnxVariantOption): OnnxVariantDisplayMeta {
   const label = option.label?.trim() || option.fileName;
   const prefix = `${option.fileName} - `;
@@ -626,71 +716,27 @@ const ModelSetup: React.FC<ModelSetupProps> = ({ config, onConfigChange, onLoadM
                  {config.localFiles && config.localFiles.length > 0 && (
                     <div className="space-y-3">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            {/* Model File Check */}
-                            {localModelStatus.ready ? (
-                                <div className="p-3 rounded-lg border flex items-center justify-between bg-green-500/10 border-green-500/30">
-                                    <div className="flex items-center gap-2">
-                                        <Box className="w-4 h-4 text-green-400" />
-                                        <span className="text-sm text-gray-300">Model File</span>
-                                    </div>
-                                    <Check className="w-4 h-4 text-green-400" /> 
-                                </div>
-                            ) : (
-                                <label className="p-3 rounded-lg border flex items-center justify-between bg-red-500/10 border-red-500/30 cursor-pointer hover:bg-red-500/20 transition-colors group">
-                                    <input type="file" accept=".onnx" className="hidden" onChange={handleSingleFileUpload} />
-                                    <div className="flex items-center gap-2">
-                                        <Box className="w-4 h-4 text-red-400" />
-                                        <span className="text-sm text-gray-300 group-hover:text-gray-200">Model File</span>
-                                    </div>
-                                    <div className="flex items-center justify-center w-7 h-7 rounded-full text-red-300 bg-red-500/20 group-hover:bg-red-500/30 group-hover:text-red-200 transition-colors">
-                                        <FilePlus className="w-4 h-4" />
-                                    </div>
-                                </label>
-                            )}
-                            
-                            {/* Config File Check */}
-                            {localModelStatus.hasConfig ? (
-                                <div className="p-3 rounded-lg border flex items-center justify-between bg-green-500/10 border-green-500/30">
-                                    <div className="flex items-center gap-2">
-                                        <FileJson className="w-4 h-4 text-green-400" />
-                                        <span className="text-sm text-gray-300">Config</span>
-                                    </div>
-                                    <Check className="w-4 h-4 text-green-400" />
-                                </div>
-                            ) : (
-                                <label className="p-3 rounded-lg border flex items-center justify-between bg-red-500/10 border-red-500/30 cursor-pointer hover:bg-red-500/20 transition-colors group">
-                                    <input type="file" accept=".json" className="hidden" onChange={handleSingleFileUpload} />
-                                    <div className="flex items-center gap-2">
-                                        <FileJson className="w-4 h-4 text-red-400" />
-                                        <span className="text-sm text-gray-300 group-hover:text-gray-200">Config</span>
-                                    </div>
-                                    <div className="flex items-center justify-center w-7 h-7 rounded-full text-red-300 bg-red-500/20 group-hover:bg-red-500/30 group-hover:text-red-200 transition-colors">
-                                        <FilePlus className="w-4 h-4" />
-                                    </div>
-                                </label>
-                            )}
-
-                            {/* Preprocessor Check */}
-                            {localModelStatus.hasPreprocessor ? (
-                                <div className="p-3 rounded-lg border flex items-center justify-between bg-green-500/10 border-green-500/30">
-                                    <div className="flex items-center gap-2">
-                                        <Settings className="w-4 h-4 text-green-400" />
-                                        <span className="text-sm text-gray-300">Preprocessor</span>
-                                    </div>
-                                    <Check className="w-4 h-4 text-green-400" />
-                                </div>
-                            ) : (
-                                <label className="p-3 rounded-lg border flex items-center justify-between bg-red-500/10 border-red-500/30 cursor-pointer hover:bg-red-500/20 transition-colors group">
-                                    <input type="file" accept=".json" className="hidden" onChange={handleSingleFileUpload} />
-                                    <div className="flex items-center gap-2">
-                                        <Settings className="w-4 h-4 text-red-400" />
-                                        <span className="text-sm text-gray-300 group-hover:text-gray-200">Preprocessor</span>
-                                    </div>
-                                    <div className="flex items-center justify-center w-7 h-7 rounded-full text-red-300 bg-red-500/20 group-hover:bg-red-500/30 group-hover:text-red-200 transition-colors">
-                                        <FilePlus className="w-4 h-4" />
-                                    </div>
-                                </label>
-                            )}
+                            <LocalModelRequirementCard
+                              label="Model File"
+                              ready={localModelStatus.ready}
+                              icon={Box}
+                              accept=".onnx"
+                              onUpload={handleSingleFileUpload}
+                            />
+                            <LocalModelRequirementCard
+                              label="Config"
+                              ready={localModelStatus.hasConfig}
+                              icon={FileJson}
+                              accept=".json"
+                              onUpload={handleSingleFileUpload}
+                            />
+                            <LocalModelRequirementCard
+                              label="Preprocessor"
+                              ready={localModelStatus.hasPreprocessor}
+                              icon={Settings}
+                              accept=".json"
+                              onUpload={handleSingleFileUpload}
+                            />
                         </div>
                         
                         {/* ONNX Variant Selector */}
@@ -743,136 +789,91 @@ const ModelSetup: React.FC<ModelSetupProps> = ({ config, onConfigChange, onLoadM
                     {(!isMobile || showMobilePreprocessPanel) && (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-fadeIn">
 
-                        {/* Option 1: Pad */}
-                        <div 
-                            onClick={() => onConfigChange({...config, preprocessing: { ...config.preprocessing, resizeMethod: ResizeMethod.PAD }})}
-                            className={`relative cursor-pointer group rounded-xl border p-4 transition-all flex flex-col gap-3
-                                ${config.preprocessing.resizeMethod === ResizeMethod.PAD
-                                    ? 'bg-accent-900/10 border-accent-500 ring-1 ring-accent-500/50' 
-                                    : 'bg-gray-950/30 border-gray-800 hover:border-gray-600 hover:bg-gray-900'
-                                }
-                            `}
-                        >
+                        <ResizeMethodCard
+                          active={config.preprocessing.resizeMethod === ResizeMethod.PAD}
+                          onSelect={() => onConfigChange({ ...config, preprocessing: { ...config.preprocessing, resizeMethod: ResizeMethod.PAD } })}
+                          icon={Layout}
+                          iconClassName="text-green-400"
+                          title="Letterbox Pad"
+                          description="Resize to fit within target and fill borders with blur, mirror, or solid color."
+                          preview={(
                             <div className="flex items-center justify-center gap-4 h-16 bg-gray-900/50 rounded-lg border border-gray-800/50">
-                                <div className="w-6 h-8 bg-gray-700 border border-gray-500 rounded-sm"></div>
-                                <ArrowRight className="w-4 h-4 text-gray-600" />
-                                <div className="w-8 h-8 bg-black border border-gray-700 rounded-sm flex items-center justify-center">
-                                     <div className="h-8 w-6 bg-gray-700 border border-gray-500"></div>
-                                </div>
+                              <div className="w-6 h-8 bg-gray-700 border border-gray-500 rounded-sm"></div>
+                              <ArrowRight className="w-4 h-4 text-gray-600" />
+                              <div className="w-8 h-8 bg-black border border-gray-700 rounded-sm flex items-center justify-center">
+                                <div className="h-8 w-6 bg-gray-700 border border-gray-500"></div>
+                              </div>
                             </div>
-                            <div>
-                                <div className="flex items-center gap-2 font-bold text-sm text-gray-200">
-                                    <Layout className="w-4 h-4 text-green-400" /> Letterbox Pad
-                                </div>
-                                <p className="text-[10px] text-gray-500 mt-1 leading-snug">
-                                    Resize to fit within target and fill borders with blur, mirror, or solid color.
-                                </p>
+                          )}
+                          details={(
+                            <div className="mt-2 pt-2 border-t border-gray-700/50 flex items-center justify-between animate-fadeIn" onClick={(e) => e.stopPropagation()}>
+                              <span className="text-[10px] text-gray-400 font-semibold">Background</span>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => onConfigChange({ ...config, preprocessing: { ...config.preprocessing, padStyle: PadStyle.BLUR } })}
+                                  className={`w-5 h-5 rounded-full border transition-all overflow-hidden relative ${config.preprocessing.padStyle === PadStyle.BLUR ? 'border-white ring-2 ring-white/30 scale-110' : 'border-gray-600 hover:border-gray-400 opacity-80 hover:opacity-100'}`}
+                                  title="Smart Blur"
+                                >
+                                  <div className="absolute inset-0 bg-gradient-to-br from-pink-500 via-purple-500 to-cyan-500 blur-[1px]" />
+                                </button>
+                                <button
+                                  onClick={() => onConfigChange({ ...config, preprocessing: { ...config.preprocessing, padStyle: PadStyle.REFLECT } })}
+                                  className={`w-5 h-5 rounded-full border transition-all overflow-hidden relative ${config.preprocessing.padStyle === PadStyle.REFLECT ? 'border-white ring-2 ring-white/30 scale-110' : 'border-gray-600 hover:border-gray-400 opacity-90 hover:opacity-100'}`}
+                                  title="Mirror / Reflect"
+                                >
+                                  <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-600 to-gray-200" />
+                                  <div className="absolute inset-y-0 left-1/2 w-px bg-gray-900/70 -translate-x-1/2" />
+                                </button>
+                                <button
+                                  onClick={() => onConfigChange({ ...config, preprocessing: { ...config.preprocessing, padStyle: PadStyle.SOLID, padColor: '#000000' } })}
+                                  className={`w-5 h-5 rounded-full border transition-all ${config.preprocessing.padStyle === PadStyle.SOLID && config.preprocessing.padColor === '#000000' ? 'border-white ring-2 ring-white/30 scale-110' : 'border-gray-600 bg-black hover:border-gray-400'}`}
+                                  title="Solid Black"
+                                />
+                                <button
+                                  onClick={() => onConfigChange({ ...config, preprocessing: { ...config.preprocessing, padStyle: PadStyle.SOLID, padColor: '#ffffff' } })}
+                                  className={`w-5 h-5 rounded-full border transition-all ${config.preprocessing.padStyle === PadStyle.SOLID && config.preprocessing.padColor === '#ffffff' ? 'border-white ring-2 ring-white/30 scale-110 bg-white' : 'border-gray-600 bg-white opacity-80 hover:opacity-100'}`}
+                                  title="Solid White"
+                                />
+                              </div>
                             </div>
-                            {config.preprocessing.resizeMethod === ResizeMethod.PAD && (
-                                <div className="absolute top-2 right-2"><Check className="w-4 h-4 text-accent-500" /></div>
-                            )}
-                            
-                            {/* Unified Pad Style Selector */}
-                            {config.preprocessing.resizeMethod === ResizeMethod.PAD && (
-                                <div className="mt-2 pt-2 border-t border-gray-700/50 flex items-center justify-between animate-fadeIn" onClick={(e) => e.stopPropagation()}>
-                                    <span className="text-[10px] text-gray-400 font-semibold">Background</span>
-                                    <div className="flex gap-2">
-                                        {/* Blur (Dynamic) */}
-                                        <button 
-                                            onClick={() => onConfigChange({...config, preprocessing: {...config.preprocessing, padStyle: PadStyle.BLUR}})}
-                                            className={`w-5 h-5 rounded-full border transition-all overflow-hidden relative ${config.preprocessing.padStyle === PadStyle.BLUR ? 'border-white ring-2 ring-white/30 scale-110' : 'border-gray-600 hover:border-gray-400 opacity-80 hover:opacity-100'}`}
-                                            title="Smart Blur"
-                                        >
-                                            <div className="absolute inset-0 bg-gradient-to-br from-pink-500 via-purple-500 to-cyan-500 blur-[1px]" />
-                                        </button>
+                          )}
+                        />
 
-                                        {/* Mirror / Reflect */}
-                                        <button
-                                            onClick={() => onConfigChange({...config, preprocessing: {...config.preprocessing, padStyle: PadStyle.REFLECT}})}
-                                            className={`w-5 h-5 rounded-full border transition-all overflow-hidden relative ${config.preprocessing.padStyle === PadStyle.REFLECT ? 'border-white ring-2 ring-white/30 scale-110' : 'border-gray-600 hover:border-gray-400 opacity-90 hover:opacity-100'}`}
-                                            title="Mirror / Reflect"
-                                        >
-                                            <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-600 to-gray-200" />
-                                            <div className="absolute inset-y-0 left-1/2 w-px bg-gray-900/70 -translate-x-1/2" />
-                                        </button>
-
-                                        {/* Black (Solid) */}
-                                        <button 
-                                            onClick={() => onConfigChange({...config, preprocessing: {...config.preprocessing, padStyle: PadStyle.SOLID, padColor: '#000000'}})}
-                                            className={`w-5 h-5 rounded-full border transition-all ${config.preprocessing.padStyle === PadStyle.SOLID && config.preprocessing.padColor === '#000000' ? 'border-white ring-2 ring-white/30 scale-110' : 'border-gray-600 bg-black hover:border-gray-400'}`}
-                                            title="Solid Black"
-                                        />
-                                        
-                                        {/* White (Solid) */}
-                                        <button 
-                                            onClick={() => onConfigChange({...config, preprocessing: {...config.preprocessing, padStyle: PadStyle.SOLID, padColor: '#ffffff'}})}
-                                            className={`w-5 h-5 rounded-full border transition-all ${config.preprocessing.padStyle === PadStyle.SOLID && config.preprocessing.padColor === '#ffffff' ? 'border-white ring-2 ring-white/30 scale-110 bg-white' : 'border-gray-600 bg-white opacity-80 hover:opacity-100'}`}
-                                            title="Solid White"
-                                        />
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Option 2: Stretch */}
-                        <div 
-                            onClick={() => onConfigChange({...config, preprocessing: { ...config.preprocessing, resizeMethod: ResizeMethod.STRETCH }})}
-                            className={`relative cursor-pointer group rounded-xl border p-4 transition-all flex flex-col gap-3
-                                ${config.preprocessing.resizeMethod === ResizeMethod.STRETCH 
-                                    ? 'bg-accent-900/10 border-accent-500 ring-1 ring-accent-500/50' 
-                                    : 'bg-gray-950/30 border-gray-800 hover:border-gray-600 hover:bg-gray-900'
-                                }
-                            `}
-                        >
+                        <ResizeMethodCard
+                          active={config.preprocessing.resizeMethod === ResizeMethod.STRETCH}
+                          onSelect={() => onConfigChange({ ...config, preprocessing: { ...config.preprocessing, resizeMethod: ResizeMethod.STRETCH } })}
+                          icon={Maximize}
+                          iconClassName="text-blue-400"
+                          title="Stretch"
+                          description="Image is resized to target dimensions (e.g. 224x224) ignoring aspect ratio. May distort shape."
+                          preview={(
                             <div className="flex items-center justify-center gap-4 h-16 bg-gray-900/50 rounded-lg border border-gray-800/50">
-                                <div className="w-6 h-8 bg-gray-700 border border-gray-500 rounded-sm"></div>
-                                <ArrowRight className="w-4 h-4 text-gray-600" />
-                                <div className="w-8 h-8 bg-gray-700 border border-gray-500 rounded-sm"></div>
+                              <div className="w-6 h-8 bg-gray-700 border border-gray-500 rounded-sm"></div>
+                              <ArrowRight className="w-4 h-4 text-gray-600" />
+                              <div className="w-8 h-8 bg-gray-700 border border-gray-500 rounded-sm"></div>
                             </div>
-                            <div>
-                                <div className="flex items-center gap-2 font-bold text-sm text-gray-200">
-                                    <Maximize className="w-4 h-4 text-blue-400" /> Stretch
-                                </div>
-                                <p className="text-[10px] text-gray-500 mt-1 leading-snug">
-                                    Image is resized to target dimensions (e.g. 224x224) ignoring aspect ratio. May distort shape.
-                                </p>
-                            </div>
-                            {config.preprocessing.resizeMethod === ResizeMethod.STRETCH && (
-                                <div className="absolute top-2 right-2"><Check className="w-4 h-4 text-accent-500" /></div>
-                            )}
-                        </div>
+                          )}
+                        />
 
-                        {/* Option 3: Crop */}
-                        <div 
-                            onClick={() => onConfigChange({...config, preprocessing: { ...config.preprocessing, resizeMethod: ResizeMethod.CROP }})}
-                            className={`relative cursor-pointer group rounded-xl border p-4 transition-all flex flex-col gap-3
-                                ${config.preprocessing.resizeMethod === ResizeMethod.CROP
-                                    ? 'bg-accent-900/10 border-accent-500 ring-1 ring-accent-500/50' 
-                                    : 'bg-gray-950/30 border-gray-800 hover:border-gray-600 hover:bg-gray-900'
-                                }
-                            `}
-                        >
+                        <ResizeMethodCard
+                          active={config.preprocessing.resizeMethod === ResizeMethod.CROP}
+                          onSelect={() => onConfigChange({ ...config, preprocessing: { ...config.preprocessing, resizeMethod: ResizeMethod.CROP } })}
+                          icon={Focus}
+                          iconClassName="text-yellow-400"
+                          title="Center Crop"
+                          description="Resize shortest edge to target, then crop center. Preserves aspect ratio, loses edge info."
+                          preview={(
                             <div className="flex items-center justify-center gap-4 h-16 bg-gray-900/50 rounded-lg border border-gray-800/50">
-                                <div className="w-6 h-8 bg-gray-700 border border-gray-500 rounded-sm relative overflow-hidden">
-                                     <div className="absolute inset-0 flex items-center justify-center">
-                                         <div className="w-6 h-6 border-2 border-dashed border-yellow-500/70"></div>
-                                     </div>
+                              <div className="w-6 h-8 bg-gray-700 border border-gray-500 rounded-sm relative overflow-hidden">
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                  <div className="w-6 h-6 border-2 border-dashed border-yellow-500/70"></div>
                                 </div>
-                                <ArrowRight className="w-4 h-4 text-gray-600" />
-                                <div className="w-8 h-8 bg-gray-700 border border-yellow-500/70 rounded-sm"></div>
+                              </div>
+                              <ArrowRight className="w-4 h-4 text-gray-600" />
+                              <div className="w-8 h-8 bg-gray-700 border border-yellow-500/70 rounded-sm"></div>
                             </div>
-                            <div>
-                                <div className="flex items-center gap-2 font-bold text-sm text-gray-200">
-                                    <Focus className="w-4 h-4 text-yellow-400" /> Center Crop
-                                </div>
-                                <p className="text-[10px] text-gray-500 mt-1 leading-snug">
-                                    Resize shortest edge to target, then crop center. Preserves aspect ratio, loses edge info.
-                                </p>
-                            </div>
-                            {config.preprocessing.resizeMethod === ResizeMethod.CROP && (
-                                <div className="absolute top-2 right-2"><Check className="w-4 h-4 text-accent-500" /></div>
-                            )}
-                        </div>
+                          )}
+                        />
 
                     </div>
                     )}

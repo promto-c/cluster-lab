@@ -21,26 +21,12 @@ Example dataset button rendering is duplicated in mobile and desktop sections.
 Export actions (`Lite`/`Full`) are duplicated between mobile “More” and desktop export menu.
 
 ## Implementation Plan
-1. Refactor `components/steps/ModelSetup.tsx` local requirement cards.  
-Create `LocalModelRequirementCard` local subcomponent with props: `label`, `ready`, `icon`, `accept`, `onUpload`, `readyIcon`, `missingActionIcon`.  
-Replace the 3 repeated blocks with this component and pass existing `handleSingleFileUpload`.  
-Preserve exact ready/missing behavior and styles.
-
-2. Refactor `components/steps/ModelSetup.tsx` preprocessing cards.  
-Create `ResizeMethodCard` local subcomponent for shared card shell (active state, icon/title/description/check mark).  
-Keep specialized bodies injected as children (e.g., pad-style swatches remain custom).  
-Do not change resize method logic or pad-style selection behavior.
-
-3. Refactor `components/steps/DatasetUpload.tsx` example buttons rendering.  
-Create local `ExampleDatasetButtons` subcomponent that receives `datasets`, `loadingExample`, and `onLoadExample`.  
-Use one mapping implementation for both mobile and desktop wrappers; keep label format differences via a `compact` prop.
-
-4. Refactor `components/Gallery.tsx` export actions into one source of truth.  
+1. Refactor `components/Gallery.tsx` export actions into one source of truth.  
 Create local `EXPORT_ACTIONS` constant and `renderExportAction` helper.  
 Reuse same action descriptors for mobile “More” and desktop dropdown.  
 Keep desktop descriptions and current order exactly unchanged.
 
-5. Keep `FileFolderPickerActions` as shared cross-file component.  
+2. Keep `FileFolderPickerActions` as shared cross-file component.  
 No additional cross-file extraction in this wave unless a new duplication appears in at least two files.
 
 ## Important API / Interface / Type Changes
