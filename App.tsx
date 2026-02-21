@@ -6,6 +6,7 @@ import ModelSetup from './components/steps/ModelSetup';
 import DatasetUpload from './components/steps/DatasetUpload';
 import EmbeddingStudio from './components/steps/EmbeddingStudio';
 import ClusteringView from './components/ClusteringView';
+import ScatterView3D from './components/steps/ScatterView3D';
 
 import { ModelConfig, ModelSource, ProcessingStatus, InferenceResult, LogEntry, GalleryItem, AppStep, ResizeMethod, PadStyle } from './types';
 import { DEFAULT_REMOTE_ONNX_FILE, loadModel, runInference as runDinoInference, type ModelDownloadProgressEntry } from './services/dinoService';
@@ -533,11 +534,13 @@ const App: React.FC = () => {
     }
   }, [currentStep]);
   
+  const clusteringDone = embeddingsReady && galleryImages.some(i => i.clusterLabel !== undefined);
   const completedSteps = [
     modelReady,          // Init
     datasetReady,        // Dataset
     embeddingsReady,     // Embed
-    false                // Cluster (Always repeatable)
+    clusteringDone,      // Cluster
+    false                // Visualize (Always explorable)
   ];
 
   // --- Render ---
@@ -606,6 +609,14 @@ const App: React.FC = () => {
               setIsProcessing={(val) => setStatus(val ? 'clustering' : 'ready')}
               onLog={addLog}
               onProgressUpdate={setLogProgress}
+            />
+          )}
+
+          {currentStep === AppStep.VISUALIZE && (
+            <ScatterView3D
+              items={galleryImages}
+              selectedId={selectedGalleryId}
+              onSelect={handleGallerySelect}
             />
           )}
         </div>

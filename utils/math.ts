@@ -204,6 +204,295 @@ export function mean(data: number[]): number {
   return data.reduce((a, b) => a + b, 0) / data.length;
 }
 
+// --- Dimensionality Reduction ---
+
+/**
+ * Reduce high-dimensional embeddings to `dims` dimensions via PCA.
+ * Returns an array of [x,y,z] (or [x,y] etc.) per input point.
+ */
+export function reducePCA(data: number[][], dims: number = 3): number[][] {
+  if (data.length === 0) return [];
+  return computePCA(data, dims);
+}
+
+/**
+ * Simple UMAP-like layout via stochastic neighbor embedding in low-D.
+ * This is a lightweight Barnes-Hut-free implementation suitable for
+ * a few thousand points in-browser.
+ */
+export function reduceUMAP(
+  data: number[][],
+  dims: number = 3,
+  nNeighbors: number = 15,
+  minDist: number = 0.1,
+  nEpochs: number = 200
+): number[][] {
+  const n = data.length;
+  if (n === 0) return [];
+  if (n === 1) return [new Array(dims).fill(0)];
+
+  const k = Math.min(nNeighbors, n - 1);
+
+  // 1. Build kNN graph (brute force, euclidean)
+  const dists: { idx: number; d: number }[][] = new Array(n);
+  for (let i = 0; i < n; i++) {
+    const row: { idx: number; d: number }[] = [];
+    for (let j = 0; j < n; j++) {
+      if (i === j) continue;
+      row.push({ idx: j, d: euclideanDistance(data[i], data[j]) });
+    }
+    row.sort((a, b) => a.d - b.d);
+    dists[i] = row.slice(0, k);
+  }
+
+  // 2. Compute smooth knn-distances (sigma)
+  const sigmas: number[] = new Array(n);
+  for (let i = 0; i < n; i++) {
+    const rho = dists[i][0].d; // Distance to nearest neighbor
+    // Binary search for sigma such that sum of exp(-(d-rho)/sigma) ≈ log2(k)
+    const target = Math.log2(k);
+    let lo = 1e-10, hi = 1000, mid = 1;
+    for (let iter = 0; iter < 64; iter++) {
+      mid = (lo + hi) / 2;
+      let sum = 0;
+      for (const nb of dists[i]) {
+        const dScaled = Math.max(nb.d - rho, 0) / mid;
+        sum += Math.exp(-dScaled);
+      }
+      if (sum > target) lo = mid;
+      else hi = mid;
+      if (Math.abs(sum - target) < 1e-5) break;
+    }
+    sigmas[i] = mid;
+  }
+
+  // 3. Build symmetrized graph weights
+  type Edge = { i: number; j: number; w: number };
+  const edgeMap = new Map<string, Edge>();
+  for (let i = 0; i < n; i++) {
+    const rho = dists[i][0].d;
+    for (const nb of dists[i]) {
+      const w = Math.exp(-Math.max(nb.d - rho, 0) / sigmas[i]);
+      const key = i < nb.idx ? `${i}-${nb.idx}` : `${nb.idx}-${i}`;
+      const existing = edgeMap.get(key);
+      if (existing) {
+        // Symmetrize: w_sym = w_ij + w_ji - w_ij * w_ji
+        existing.w = existing.w + w - existing.w * w;
+      } else {
+        edgeMap.set(key, { i: Math.min(i, nb.idx), j: Math.max(i, nb.idx), w });
+      }
+    }
+  }
+  const edges = Array.from(edgeMap.values());
+
+  // 4. Initialize low-dim with spectral-like init (PCA fallback)
+  let Y: number[][];
+  if (n > dims) {
+    Y = computePCA(data, dims);
+    // Scale to small range
+    for (let d = 0; d < dims; d++) {
+      const col = Y.map(r => r[d]);
+      const mn = Math.min(...col);
+      const mx = Math.max(...col);
+      const rng = mx - mn || 1;
+      for (let i = 0; i < n; i++) Y[i][d] = ((Y[i][d] - mn) / rng - 0.5) * 10;
+    }
+  } else {
+    Y = data.map(() => Array.from({ length: dims }, () => (Math.random() - 0.5) * 10));
+  }
+
+  // 5. Optimization (simplified SGD with edge sampling)
+  const a = 1.0;
+  const b = 1.0 / Math.max(minDist, 0.001);
+
+  for (let epoch = 0; epoch < nEpochs; epoch++) {
+    const alpha = 1.0 - epoch / nEpochs; // Learning rate decay
+    const lr = Math.max(alpha, 0.01);
+
+    // Attractive forces (along graph edges)
+    for (const edge of edges) {
+      const { i: ei, j: ej, w } = edge;
+      let distSq = 0;
+      for (let d = 0; d < dims; d++) {
+        distSq += (Y[ei][d] - Y[ej][d]) ** 2;
+      }
+      const dist = Math.sqrt(distSq) + 1e-4;
+      const gradCoeff = (-2 * a * b * Math.pow(distSq, b / 2 - 1)) / (1 + a * Math.pow(distSq, b)) * w;
+
+      for (let d = 0; d < dims; d++) {
+        const grad = gradCoeff * (Y[ei][d] - Y[ej][d]) * lr;
+        const clampedGrad = Math.max(-4, Math.min(4, grad));
+        Y[ei][d] += clampedGrad;
+        Y[ej][d] -= clampedGrad;
+      }
+    }
+
+    // Repulsive forces (sample negative edges)
+    const nNeg = Math.min(5, n - 1);
+    for (let i = 0; i < n; i++) {
+      for (let s = 0; s < nNeg; s++) {
+        const j = Math.floor(Math.random() * n);
+        if (j === i) continue;
+        let distSq = 0;
+        for (let d = 0; d < dims; d++) {
+          distSq += (Y[i][d] - Y[j][d]) ** 2;
+        }
+        const repGrad = (2 * b) / ((0.001 + distSq) * (1 + a * Math.pow(distSq, b)));
+        for (let d = 0; d < dims; d++) {
+          const grad = repGrad * (Y[i][d] - Y[j][d]) * lr;
+          const clampedGrad = Math.max(-4, Math.min(4, grad));
+          Y[i][d] += clampedGrad;
+        }
+      }
+    }
+  }
+
+  return Y;
+}
+
+/**
+ * t-SNE dimensionality reduction (simplified Barnes-Hut-free).
+ * Suitable for up to a few thousand points in-browser.
+ */
+export function reduceTSNE(
+  data: number[][],
+  dims: number = 3,
+  perplexity: number = 30,
+  nIter: number = 300,
+  learningRate: number = 200
+): number[][] {
+  const n = data.length;
+  if (n === 0) return [];
+  if (n === 1) return [new Array(dims).fill(0)];
+
+  const perp = Math.min(perplexity, Math.floor((n - 1) / 3));
+
+  // 1. Compute pairwise squared distances
+  const D: number[] = new Array(n * n).fill(0);
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      let s = 0;
+      for (let k = 0; k < data[i].length; k++) {
+        s += (data[i][k] - data[j][k]) ** 2;
+      }
+      D[i * n + j] = s;
+      D[j * n + i] = s;
+    }
+  }
+
+  // 2. Compute pairwise affinities P with binary search for sigma
+  const P: number[] = new Array(n * n).fill(0);
+  const targetEntropy = Math.log(perp);
+
+  for (let i = 0; i < n; i++) {
+    let lo = 1e-10, hi = 1e4, beta = 1;
+    for (let iter = 0; iter < 50; iter++) {
+      beta = (lo + hi) / 2;
+      let sum = 0;
+      let entropy = 0;
+      for (let j = 0; j < n; j++) {
+        if (j === i) continue;
+        const val = Math.exp(-D[i * n + j] * beta);
+        sum += val;
+      }
+      if (sum === 0) sum = 1e-10;
+      for (let j = 0; j < n; j++) {
+        if (j === i) continue;
+        const pj = Math.exp(-D[i * n + j] * beta) / sum;
+        if (pj > 1e-7) entropy -= pj * Math.log(pj);
+      }
+      if (entropy > targetEntropy) lo = beta;
+      else hi = beta;
+      if (Math.abs(entropy - targetEntropy) < 1e-5) break;
+    }
+    // Set row
+    let sum = 0;
+    for (let j = 0; j < n; j++) {
+      if (j === i) { P[i * n + j] = 0; continue; }
+      const val = Math.exp(-D[i * n + j] * beta);
+      P[i * n + j] = val;
+      sum += val;
+    }
+    if (sum === 0) sum = 1e-10;
+    for (let j = 0; j < n; j++) P[i * n + j] /= sum;
+  }
+
+  // Symmetrize
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      const sym = (P[i * n + j] + P[j * n + i]) / (2 * n);
+      P[i * n + j] = Math.max(sym, 1e-12);
+      P[j * n + i] = Math.max(sym, 1e-12);
+    }
+  }
+
+  // 3. Initialize Y with PCA or random
+  let Y: number[][];
+  if (n > dims) {
+    Y = computePCA(data, dims);
+    for (let i = 0; i < n; i++) {
+      for (let d = 0; d < dims; d++) Y[i][d] *= 0.0001;
+    }
+  } else {
+    Y = data.map(() => Array.from({ length: dims }, () => (Math.random() - 0.5) * 0.0001));
+  }
+
+  // Gradient descent
+  const gains: number[][] = Y.map(() => new Array(dims).fill(1));
+  const yVel: number[][] = Y.map(() => new Array(dims).fill(0));
+  const momentum = 0.5;
+  const finalMomentum = 0.8;
+
+  for (let iter = 0; iter < nIter; iter++) {
+    const mom = iter < 100 ? momentum : finalMomentum;
+
+    // Compute Q (student-t)
+    const Q: number[] = new Array(n * n).fill(0);
+    let qSum = 0;
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
+        let dSq = 0;
+        for (let d = 0; d < dims; d++) dSq += (Y[i][d] - Y[j][d]) ** 2;
+        const val = 1 / (1 + dSq);
+        Q[i * n + j] = val;
+        Q[j * n + i] = val;
+        qSum += 2 * val;
+      }
+    }
+    if (qSum === 0) qSum = 1e-10;
+
+    // Gradient
+    for (let i = 0; i < n; i++) {
+      for (let d = 0; d < dims; d++) {
+        let grad = 0;
+        for (let j = 0; j < n; j++) {
+          if (j === i) continue;
+          const pq = P[i * n + j] - Q[i * n + j] / qSum;
+          grad += 4 * pq * Q[i * n + j] * (Y[i][d] - Y[j][d]);
+        }
+        // Adaptive gains
+        if (Math.sign(grad) !== Math.sign(yVel[i][d])) {
+          gains[i][d] = Math.min(gains[i][d] + 0.2, 5);
+        } else {
+          gains[i][d] = Math.max(gains[i][d] * 0.8, 0.01);
+        }
+        yVel[i][d] = mom * yVel[i][d] - learningRate * gains[i][d] * grad;
+        Y[i][d] += yVel[i][d];
+      }
+    }
+
+    // Center
+    for (let d = 0; d < dims; d++) {
+      let avg = 0;
+      for (let i = 0; i < n; i++) avg += Y[i][d];
+      avg /= n;
+      for (let i = 0; i < n; i++) Y[i][d] -= avg;
+    }
+  }
+
+  return Y;
+}
+
 export function findElbowIndex(data: number[]): number {
   if (data.length < 3) return 0;
   

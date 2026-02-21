@@ -45,7 +45,9 @@ const EmbeddingStudio: React.FC<EmbeddingStudioProps> = ({
     
     const generatePreview = async () => {
       if (!selectedItem) {
-        if (active) setProcessedImageSrc(null);
+        if (active) {
+          setProcessedImageSrc(null);
+        }
         return;
       }
 
@@ -56,10 +58,14 @@ const EmbeddingStudio: React.FC<EmbeddingStudioProps> = ({
       // For now, we generate based on current global config to give instant feedback on "Crop vs Pad".
       try {
         const url = await processImageForDisplay(selectedItem.file, preprocessingConfig);
-        if (active) setProcessedImageSrc(url);
+        if (active) {
+          setProcessedImageSrc(url);
+        }
       } catch (e) {
         console.error("Failed to generate preview", e);
-        if (active) setProcessedImageSrc(selectedItem.url); // Fallback
+        if (active) {
+          setProcessedImageSrc(selectedItem.url); // Fallback
+        }
       }
     };
 
@@ -73,6 +79,7 @@ const EmbeddingStudio: React.FC<EmbeddingStudioProps> = ({
       {/* Visualizer Area (Hero) */}
       <div className="flex-1 min-h-0 bg-gray-900 border border-gray-800 rounded-xl overflow-hidden relative shadow-2xl">
          {/* We pass processedImageSrc if available, otherwise fallback to raw imageSrc */}
+         {/* Only render when not loading to prevent flash */}
          <Visualizer 
            imageSrc={processedImageSrc || imageSrc} 
            result={result} 
@@ -86,7 +93,7 @@ const EmbeddingStudio: React.FC<EmbeddingStudioProps> = ({
             <div className="absolute top-2 left-2 md:top-4 md:left-4 bg-gray-900/80 backdrop-blur border border-gray-700 p-2.5 md:p-3 rounded-lg max-w-[15rem] md:max-w-xs pointer-events-none">
                <h3 className="text-xs md:text-sm font-bold text-white mb-1">Feature Extraction</h3>
                <p className="text-[11px] md:text-xs text-gray-400">
-                 Select an image from the gallery below to visualize its patch embeddings in 3D space, or click "Run Embeddings" to process the entire batch.
+                 Select an image from the gallery below to visualize its patch embeddings as a 2D overlay, or click "Run Embeddings" to process the entire batch.
                </p>
             </div>
          )}

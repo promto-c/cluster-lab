@@ -1,48 +1,9 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Canvas } from '@react-three/fiber';
-import { OrbitControls, useTexture } from '@react-three/drei';
-import * as THREE from 'three';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { InferenceResult, VisSettings, ColormapType } from '../types';
 import { computePCA, extractChannel, mapDataToColors, fitPCA, projectPCA, computeChannelRanges, ChannelRange } from '../utils/math';
-import { Maximize2, Image as ImageIcon, Settings2, Box, Grid, AlertTriangle } from 'lucide-react';
+import { Image as ImageIcon, Settings2, Grid, AlertTriangle } from 'lucide-react';
 import SliderField from './SliderField';
 import useMediaQuery from '../utils/useMediaQuery';
-
-// Augment JSX namespace to include Three.js elements used by @react-three/fiber
-// We include both global JSX and React.JSX to cover various TS/React version combinations.
-declare global {
-  namespace JSX {
-    interface IntrinsicElements {
-      mesh: any;
-      group: any;
-      instancedMesh: any;
-      planeGeometry: any;
-      boxGeometry: any;
-      meshBasicMaterial: any;
-      meshStandardMaterial: any;
-      ambientLight: any;
-      directionalLight: any;
-      color: any;
-    }
-  }
-}
-
-declare module 'react' {
-  namespace JSX {
-    interface IntrinsicElements {
-      mesh: any;
-      group: any;
-      instancedMesh: any;
-      planeGeometry: any;
-      boxGeometry: any;
-      meshBasicMaterial: any;
-      meshStandardMaterial: any;
-      ambientLight: any;
-      directionalLight: any;
-      color: any;
-    }
-  }
-}
 
 interface VisualizerProps {
   imageSrc: string | null;
@@ -52,116 +13,6 @@ interface VisualizerProps {
   onBuildGlobalPca?: () => void;
   globalPcaSnapshotAt?: number | null;
 }
-
-interface CanvasErrorBoundaryProps {
-  children: React.ReactNode;
-  fallback: React.ReactNode;
-}
-
-interface CanvasErrorBoundaryState {
-  hasError: boolean;
-}
-
-class CanvasErrorBoundary extends React.Component<CanvasErrorBoundaryProps, CanvasErrorBoundaryState> {
-  constructor(props: CanvasErrorBoundaryProps) {
-    super(props);
-    this.state = { hasError: false };
-  }
-
-  static getDerivedStateFromError(): CanvasErrorBoundaryState {
-    return { hasError: true };
-  }
-
-  componentDidCatch(error: Error) {
-    console.warn('Visualizer render failed:', error.message);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return this.props.fallback;
-    }
-    return this.props.children;
-  }
-}
-
-// --- 3D Components ---
-
-const ImagePlane: React.FC<{ src: string, width: number, height: number, visible: boolean }> = ({ src, width, height, visible }) => {
-  const texture = useTexture(src);
-  if (!visible) return null;
-
-  return (
-    <mesh position={[0, 0, -0.1]}>
-      <planeGeometry args={[width, height]} />
-      <meshBasicMaterial map={texture} toneMapped={false} transparent opacity={0.5} side={THREE.DoubleSide} />
-    </mesh>
-  );
-};
-
-const PatchGrid: React.FC<{ 
-  result: InferenceResult, 
-  settings: VisSettings,
-  computedColors: number[][]
-}> = ({ result, settings, computedColors }) => {
-  const meshRef = useRef<THREE.InstancedMesh>(null);
-  const { width: gridW, height: gridH } = result.dimensions;
-  const count = gridW * gridH;
-
-  // Reusable objects to avoid GC churn
-  const dummy = useMemo(() => new THREE.Object3D(), []);
-  const color = useMemo(() => new THREE.Color(), []);
-
-  useEffect(() => {
-    if (!meshRef.current) return;
-
-    // Center offsets
-    const offsetX = -gridW / 2;
-    const offsetY = -gridH / 2;
-
-    for (let i = 0; i < count; i++) {
-       const x = i % gridW;
-       const y = Math.floor(i / gridW);
-       
-       const rgb = computedColors[i] || [0,0,0]; // Graceful fallback
-       
-       // Calculate brightness for extrusion height
-       const brightness = (rgb[0] + rgb[1] + rgb[2]) / (255 * 3);
-       const zHeight = settings.extrusion * brightness * 10; // Scale factor
-
-       // Position: Flip Y to match image coordinates (Top-Left 0,0)
-       // Three.js 0,0 is center. 
-       // x: goes from -W/2 to W/2
-       // y: goes from H/2 to -H/2
-       const posX = offsetX + x + 0.5;
-       const posY = -(offsetY + y + 0.5); // Flip Y
-
-       dummy.position.set(posX, posY, zHeight / 2);
-       dummy.scale.set(0.95, 0.95, Math.max(0.1, zHeight)); // Scale cube. 0.95 for small gap
-       dummy.updateMatrix();
-
-       meshRef.current.setMatrixAt(i, dummy.matrix);
-       
-       color.setRGB(rgb[0]/255, rgb[1]/255, rgb[2]/255);
-       meshRef.current.setColorAt(i, color);
-    }
-    
-    meshRef.current.instanceMatrix.needsUpdate = true;
-    if (meshRef.current.instanceColor) meshRef.current.instanceColor.needsUpdate = true;
-
-  }, [result, settings, computedColors, gridW, gridH]);
-
-  return (
-    <instancedMesh ref={meshRef} args={[undefined, undefined, count]}>
-      <boxGeometry args={[1, 1, 1]} />
-      <meshStandardMaterial 
-        transparent 
-        opacity={settings.opacity} 
-        roughness={0.5} 
-        metalness={0.1}
-      />
-    </instancedMesh>
-  );
-};
 
 
 // --- Main Visualizer ---
@@ -174,8 +25,6 @@ const Visualizer: React.FC<VisualizerProps> = ({
   onBuildGlobalPca,
   globalPcaSnapshotAt = null
 }) => {
-  const EXTRUSION_MAX = 2;
-  const EXTRUSION_STEP = 0.005;
   const OPACITY_STEP = 0.005;
   const isMobile = useMediaQuery('(max-width: 767px)');
 
@@ -184,8 +33,7 @@ const Visualizer: React.FC<VisualizerProps> = ({
     components: 3,
     channelIndex: 0,
     colormap: 'rgb',
-    opacity: 0.9,
-    extrusion: 0
+    opacity: 0.5
   });
 
   const [showControls, setShowControls] = useState(() => !isMobile);
@@ -252,6 +100,96 @@ const Visualizer: React.FC<VisualizerProps> = ({
     return { colors };
   }, [result, hasPatches, settings.mode, settings.components, settings.channelIndex, settings.colormap, useGlobalPca, globalPca]);
 
+  // --- 2D Canvas rendering ---
+  const containerRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const imgRef = useRef<HTMLImageElement | null>(null);
+  const [imgLoaded, setImgLoaded] = useState(false);
+
+  // Load source image
+  useEffect(() => {
+    if (!imageSrc) { setImgLoaded(false); return; }
+    const img = new Image();
+    img.onload = () => { imgRef.current = img; setImgLoaded(true); };
+    img.onerror = () => { imgRef.current = null; setImgLoaded(false); };
+    img.src = imageSrc;
+    setImgLoaded(false);
+    return () => { img.onload = null; img.onerror = null; };
+  }, [imageSrc]);
+
+  // Paint canvas whenever data or settings change
+  const paint = useCallback(() => {
+    const canvas = canvasRef.current;
+    const container = containerRef.current;
+    const img = imgRef.current;
+    if (!canvas || !container) return;
+
+    // Wait for image to load before painting to prevent flash
+    if (imageSrc && !imgLoaded) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const rect = container.getBoundingClientRect();
+    const cw = rect.width;
+    const ch = rect.height;
+    canvas.width = cw * dpr;
+    canvas.height = ch * dpr;
+    canvas.style.width = `${cw}px`;
+    canvas.style.height = `${ch}px`;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    // Clear
+    ctx.fillStyle = '#09090b';
+    ctx.fillRect(0, 0, cw, ch);
+
+    // Compute fitting rect (contain)
+    let drawW = cw, drawH = ch, dx = 0, dy = 0;
+    if (img && imgLoaded) {
+      const imgAspect = img.naturalWidth / img.naturalHeight;
+      const boxAspect = cw / ch;
+      if (imgAspect > boxAspect) {
+        drawW = cw; drawH = cw / imgAspect;
+      } else {
+        drawH = ch; drawW = ch * imgAspect;
+      }
+      dx = (cw - drawW) / 2;
+      dy = (ch - drawH) / 2;
+
+      // Draw source image
+      ctx.drawImage(img, dx, dy, drawW, drawH);
+    }
+
+    // Draw patch overlay
+    if (result && hasPatches && computedData.colors.length > 0) {
+      const { width: gridW, height: gridH } = result.dimensions;
+      const patchW = drawW / gridW;
+      const patchH = drawH / gridH;
+
+      ctx.globalAlpha = settings.opacity;
+      for (let i = 0; i < computedData.colors.length; i++) {
+        const rgb = computedData.colors[i] || [0, 0, 0];
+        const x = i % gridW;
+        const y = Math.floor(i / gridW);
+        ctx.fillStyle = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+        ctx.fillRect(dx + x * patchW, dy + y * patchH, patchW + 0.5, patchH + 0.5); // +0.5 to avoid sub-pixel gaps
+      }
+      ctx.globalAlpha = 1;
+    }
+  }, [imgLoaded, result, hasPatches, computedData.colors, settings.opacity]);
+
+  useEffect(() => { paint(); }, [paint]);
+
+  // Resize observer
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const ro = new ResizeObserver(() => paint());
+    ro.observe(container);
+    return () => ro.disconnect();
+  }, [paint]);
+
   if (!imageSrc) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-gray-600 bg-gray-950/50">
@@ -264,52 +202,9 @@ const Visualizer: React.FC<VisualizerProps> = ({
   return (
     <div className="relative flex flex-col h-full bg-gray-900 rounded-xl overflow-hidden shadow-2xl border border-gray-800 group">
       
-      {/* 3D Canvas */}
-      <div className="flex-1 w-full h-full cursor-move">
-        <CanvasErrorBoundary
-          key={`canvas-${imageSrc ?? 'none'}`}
-          fallback={
-            <div className="flex h-full w-full items-center justify-center bg-gray-950/70 px-6 text-center">
-              <div className="max-w-sm">
-                <AlertTriangle className="mx-auto mb-3 h-9 w-9 text-amber-500" />
-                <p className="text-sm font-semibold text-gray-200">Preview unavailable for this file.</p>
-                <p className="mt-2 text-xs text-gray-500">Try PNG, JPEG, WebP, GIF, or BMP images.</p>
-              </div>
-            </div>
-          }
-        >
-          <Canvas camera={{ position: [0, 0, Math.max(result?.dimensions.width || 10, result?.dimensions.height || 10) * 1.5], fov: 50 }}>
-            <color attach="background" args={['#09090b']} />
-            <ambientLight intensity={0.7} />
-            <directionalLight position={[10, 10, 10]} intensity={1} />
-            <directionalLight position={[-10, -10, 5]} intensity={0.5} />
-            
-            {result && hasPatches && (
-               <group>
-                  <PatchGrid 
-                     result={result} 
-                     settings={settings} 
-                     computedColors={computedData.colors} 
-                  />
-                  {settings.opacity < 1 && (
-                    <ImagePlane 
-                      src={imageSrc} 
-                      width={result.dimensions.width} 
-                      height={result.dimensions.height}
-                      visible={true}
-                    />
-                  )}
-               </group>
-            )}
-
-            {/* Fallback if no result or no patches, just show image on a plane */}
-            {(!result || !hasPatches) && (
-               <ImagePlane src={imageSrc} width={20} height={20} visible={true} />
-            )}
-
-            <OrbitControls makeDefault />
-          </Canvas>
-        </CanvasErrorBoundary>
+      {/* 2D Canvas */}
+      <div ref={containerRef} className="flex-1 w-full h-full min-h-0">
+        <canvas ref={canvasRef} className="block w-full h-full" />
       </div>
 
       {/* Warning for Missing Patches (Imported Embeddings) */}
@@ -476,38 +371,21 @@ const Visualizer: React.FC<VisualizerProps> = ({
 
              <div className="h-px bg-gray-700 my-2"></div>
 
-             {/* 3D Controls */}
-             <div className="space-y-4">
-               <SliderField
-                 label={<span className="flex items-center gap-1"><Box className="w-3 h-3" /> 3D Extrusion</span>}
-                 value={settings.extrusion}
-                 min={0}
-                 max={EXTRUSION_MAX}
-                 step={EXTRUSION_STEP}
-                 valueFormatter={(v) => `${(v * 100).toFixed(1)}%`}
-                 thresholdScale={0.8}
-                 precisionPower={1.5}
-                 minPrecisionScale={0.005}
-                 fineStepMultiplier={0.1}
-                 onChange={(next) => setSettings(s => ({ ...s, extrusion: next }))}
-                 ariaLabel="3D extrusion"
-               />
-
-               <SliderField
-                 label={<span className="flex items-center gap-1"><Grid className="w-3 h-3" /> Grid Opacity</span>}
-                 value={settings.opacity}
-                 min={0}
-                 max={1}
-                 step={OPACITY_STEP}
-                 valueFormatter={(v) => `${(v * 100).toFixed(1)}%`}
-                 thresholdScale={0.8}
-                 precisionPower={1.5}
-                 minPrecisionScale={0.005}
-                 fineStepMultiplier={0.1}
-                 onChange={(next) => setSettings(s => ({ ...s, opacity: next }))}
-                 ariaLabel="Grid opacity"
-               />
-             </div>
+             {/* Overlay Opacity */}
+             <SliderField
+               label={<span className="flex items-center gap-1"><Grid className="w-3 h-3" /> Overlay Opacity</span>}
+               value={settings.opacity}
+               min={0}
+               max={1}
+               step={OPACITY_STEP}
+               valueFormatter={(v) => `${(v * 100).toFixed(0)}%`}
+               thresholdScale={0.8}
+               precisionPower={1.5}
+               minPrecisionScale={0.005}
+               fineStepMultiplier={0.1}
+               onChange={(next) => setSettings(s => ({ ...s, opacity: next }))}
+               ariaLabel="Overlay opacity"
+             />
 
           </div>
         </div>
@@ -542,10 +420,7 @@ const Visualizer: React.FC<VisualizerProps> = ({
               <span className="hidden md:inline">Patches: {result.patches.length}</span>
               <span className="hidden md:inline">Embed Dim: {embedDim}</span>
            </div>
-           <div className="flex items-center gap-1 text-accent-400">
-             <Maximize2 className="w-3 h-3" />
-             <span className="hidden md:inline">Interactive 3D View</span>
-           </div>
+           <span className="text-accent-400 text-[11px]">2D Overlay</span>
         </div>
       )}
     </div>

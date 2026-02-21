@@ -10,8 +10,11 @@ export enum AppStep {
   INITIALIZE = 0,
   DATASET = 1,
   EMBED = 2,
-  CLUSTER = 3
+  CLUSTER = 3,
+  VISUALIZE = 4
 }
+
+export type DimReductionMethod = 'raw' | 'pca' | 'umap' | 'tsne';
 
 export enum ResizeMethod {
   STRETCH = 'STRETCH',
@@ -92,7 +95,6 @@ export interface VisSettings {
   channelIndex: number; // 0 to embed_dim-1
   colormap: ColormapType;
   opacity: number; // 0-1
-  extrusion: number; // 0-2 (height factor)
 }
 
 // --- Clustering Types ---
