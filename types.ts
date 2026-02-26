@@ -10,8 +10,7 @@ export enum AppStep {
   INITIALIZE = 0,
   DATASET = 1,
   EMBED = 2,
-  CLUSTER = 3,
-  VISUALIZE = 4
+  VISUALIZE = 3
 }
 
 export type DimReductionMethod = 'raw' | 'pca' | 'umap' | 'tsne';

@@ -5,10 +5,10 @@ import Sidebar from './components/Sidebar';
 import ModelSetup from './components/steps/ModelSetup';
 import DatasetUpload from './components/steps/DatasetUpload';
 import EmbeddingStudio from './components/steps/EmbeddingStudio';
-import ClusteringView from './components/ClusteringView';
 import ScatterView3D from './components/steps/ScatterView3D';
 
 import { ModelConfig, ModelSource, ProcessingStatus, InferenceResult, LogEntry, GalleryItem, AppStep, ResizeMethod, PadStyle } from './types';
+// ClusteringView is no longer a separate step - it's rendered inside EmbeddingStudio
 import { DEFAULT_REMOTE_ONNX_FILE, loadModel, runInference as runDinoInference, type ModelDownloadProgressEntry } from './services/dinoService';
 import { runClassicalInference } from './services/classicalService';
 import { generateThumbnail } from './utils/imageProcessing';
@@ -529,17 +529,15 @@ const App: React.FC = () => {
   }, [isStandalonePwa]);
 
   useEffect(() => {
-    if (currentStep !== AppStep.CLUSTER) {
+    if (currentStep !== AppStep.EMBED) {
       setLogProgress(null);
     }
   }, [currentStep]);
   
-  const clusteringDone = embeddingsReady && galleryImages.some(i => i.clusterLabel !== undefined);
   const completedSteps = [
     modelReady,          // Init
     datasetReady,        // Dataset
-    embeddingsReady,     // Embed
-    clusteringDone,      // Cluster
+    embeddingsReady,     // Embed (includes clustering)
     false                // Visualize (Always explorable)
   ];
 
@@ -598,17 +596,14 @@ const App: React.FC = () => {
               globalPcaSamples={globalPcaSamples}
               onBuildGlobalPca={() => rebuildGlobalPcaSamples('manual refresh')}
               globalPcaSnapshotAt={globalPcaSnapshotAt}
-            />
-          )}
-
-          {currentStep === AppStep.CLUSTER && (
-            <ClusteringView 
-              items={galleryImages}
-              onUpdateItems={setGalleryImages}
-              isProcessing={status === 'clustering'}
-              setIsProcessing={(val) => setStatus(val ? 'clustering' : 'ready')}
-              onLog={addLog}
-              onProgressUpdate={setLogProgress}
+              clusteringProps={{
+                items: galleryImages,
+                onUpdateItems: setGalleryImages,
+                isProcessing: status === 'clustering',
+                setIsProcessing: (val) => setStatus(val ? 'clustering' : 'ready'),
+                onLog: addLog,
+                onProgressUpdate: setLogProgress,
+              }}
             />
           )}
 
