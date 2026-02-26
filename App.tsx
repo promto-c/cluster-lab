@@ -4,7 +4,6 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import Sidebar from './components/Sidebar';
 import ModelSetup from './components/steps/ModelSetup';
 import DatasetUpload from './components/steps/DatasetUpload';
-import EmbeddingStudio from './components/steps/EmbeddingStudio';
 import ClusteringView from './components/ClusteringView';
 import ScatterView3D from './components/steps/ScatterView3D';
 
@@ -417,7 +416,7 @@ const App: React.FC = () => {
   // Auto-run inference when selecting an item that hasn't been processed
   useEffect(() => {
     if (
-      currentStep === AppStep.EMBED &&
+      currentStep === AppStep.DATASET &&
       status === 'ready' &&
       selectedItem &&
       !selectedItem.result &&
@@ -537,8 +536,7 @@ const App: React.FC = () => {
   const clusteringDone = embeddingsReady && galleryImages.some(i => i.clusterLabel !== undefined);
   const completedSteps = [
     modelReady,          // Init
-    datasetReady,        // Dataset
-    embeddingsReady,     // Embed
+    embeddingsReady,     // Dataset (includes embed)
     clusteringDone,      // Cluster
     false                // Visualize (Always explorable)
   ];
@@ -580,20 +578,9 @@ const App: React.FC = () => {
               onStopRun={handleStopRun}
               isProcessing={status === 'batch_processing' || status === 'processing'}
               onEmbeddingsImported={handleEmbeddingsImported}
-            />
-          )}
-
-          {currentStep === AppStep.EMBED && (
-            <EmbeddingStudio 
-              images={galleryImages}
-              setImages={setGalleryImages}
               selectedItem={selectedItem}
-              onSelect={handleGallerySelect}
               result={result}
               imageSrc={imageSrc}
-              isProcessing={status === 'processing' || status === 'batch_processing'}
-              onRunAll={handleRunAll}
-              onStopRun={handleStopRun}
               preprocessingConfig={config.preprocessing}
               globalPcaSamples={globalPcaSamples}
               onBuildGlobalPca={() => rebuildGlobalPcaSamples('manual refresh')}

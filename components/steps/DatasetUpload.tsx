@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { GalleryItem } from '../../types';
+import { GalleryItem, InferenceResult, PreprocessingConfig } from '../../types';
 import Gallery from '../Gallery';
-import { ImagePlus, Loader2, Database, ChevronDown, Images } from 'lucide-react';
+import Visualizer from '../Visualizer';
+import { processImageForDisplay, generateThumbnail } from '../../utils/imageProcessing';
+import { ImagePlus, Loader2, Database, ChevronDown, ChevronUp, Images, Layers } from 'lucide-react';
 import { Button } from '../Button';
-import { generateThumbnail } from '../../utils/imageProcessing';
 import useMediaQuery from '../../utils/useMediaQuery';
 import FileFolderPickerActions from '../FileFolderPickerActions';
 
@@ -16,6 +17,14 @@ interface DatasetUploadProps {
   onStopRun?: () => void;
   isProcessing?: boolean;
   onEmbeddingsImported?: (items: GalleryItem[], matchCount: number) => void;
+  // Visualizer props (from merged EmbeddingStudio)
+  selectedItem?: GalleryItem | null;
+  result?: InferenceResult | null;
+  imageSrc?: string | null;
+  preprocessingConfig?: PreprocessingConfig;
+  globalPcaSamples?: number[][];
+  onBuildGlobalPca?: () => void;
+  globalPcaSnapshotAt?: number | null;
 }
 
 interface ExampleDatasetButtonsProps {
@@ -253,14 +262,46 @@ const DatasetUpload: React.FC<DatasetUploadProps> = ({
   onStopRun,
   isProcessing,
   onEmbeddingsImported,
+  selectedItem,
+  result,
+  imageSrc,
+  preprocessingConfig,
+  globalPcaSamples,
+  onBuildGlobalPca,
+  globalPcaSnapshotAt,
 }) => {
   const isMobile = useMediaQuery('(max-width: 767px)');
   const [loadingExample, setLoadingExample] = useState<string | null>(null);
   const [exampleCount, setExampleCount] = useState(12);
+  const [showVisualizer, setShowVisualizer] = useState(false);
+  const [processedImageSrc, setProcessedImageSrc] = useState<string | null>(null);
 
   const filesInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const embeddingsInputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-generate processed image URL for visualization whenever selection or config changes
+  useEffect(() => {
+    let active = true;
+    
+    const generatePreview = async () => {
+      if (!selectedItem || !preprocessingConfig) {
+        if (active) setProcessedImageSrc(null);
+        return;
+      }
+
+      try {
+        const url = await processImageForDisplay(selectedItem.file, preprocessingConfig);
+        if (active) setProcessedImageSrc(url);
+      } catch (e) {
+        console.error("Failed to generate preview", e);
+        if (active) setProcessedImageSrc(selectedItem.url);
+      }
+    };
+
+    generatePreview();
+    return () => { active = false; };
+  }, [selectedItem, preprocessingConfig]);
 
   const openFilesPicker = () => {
     filesInputRef.current?.click();
@@ -407,6 +448,23 @@ const DatasetUpload: React.FC<DatasetUploadProps> = ({
       <div className="flex flex-col gap-2 shrink-0">
         <div className="flex items-center justify-between gap-2 text-xs text-gray-400 bg-gray-950/30 p-2 rounded-lg border border-gray-800/50">
           <div className="flex items-center gap-2 min-w-0 flex-1">
+            {/* Visualizer toggle button at top-left */}
+            {preprocessingConfig && (
+              <button
+                onClick={() => setShowVisualizer(!showVisualizer)}
+                className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg border transition-colors shrink-0 ${
+                  showVisualizer
+                    ? 'bg-accent-500/10 border-accent-500/30 text-accent-400'
+                    : 'bg-gray-900 border-gray-800 text-gray-400 hover:text-white hover:border-gray-700'
+                }`}
+                title="Toggle Embedding Visualizer"
+              >
+                <Layers className="w-4 h-4" />
+                <span className="text-[10px] font-bold uppercase tracking-wider hidden sm:inline">Visualizer</span>
+                {showVisualizer ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+              </button>
+            )}
+
             <div className="flex items-center gap-2 pr-2 mr-1 border-r border-gray-800/80 shrink-0">
               <div className="p-1.5 bg-accent-500/10 rounded-lg">
                 <Images className="w-4 h-4 text-accent-500" />
@@ -480,14 +538,36 @@ const DatasetUpload: React.FC<DatasetUploadProps> = ({
         </div>
       </div>
 
-      {/* Main Grid Area */}
-      <div className="flex-1 min-h-0">
+      {/* Embedding Visualizer - Shown at top when expanded */}
+      {preprocessingConfig && showVisualizer && (
+        <div className="flex-1 min-h-0 bg-gray-900 border border-gray-800 rounded-xl overflow-hidden relative shadow-2xl">
+          <Visualizer
+            imageSrc={processedImageSrc || imageSrc || null}
+            result={result || null}
+            isProcessing={!!isProcessing}
+            globalPcaSamples={globalPcaSamples || []}
+            onBuildGlobalPca={onBuildGlobalPca || (() => {})}
+            globalPcaSnapshotAt={globalPcaSnapshotAt ?? null}
+          />
+          {!selectedItem && (
+            <div className="absolute top-2 left-2 md:top-4 md:left-4 bg-gray-900/80 backdrop-blur border border-gray-700 p-2.5 md:p-3 rounded-lg max-w-[15rem] md:max-w-xs pointer-events-none">
+              <h3 className="text-xs md:text-sm font-bold text-white mb-1">Feature Extraction</h3>
+              <p className="text-[11px] md:text-xs text-gray-400">
+                Select an image from the gallery below to visualize its patch embeddings as a 2D overlay.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Gallery Area - grid when visualizer hidden, strip when visualizer shown */}
+      <div className={`min-h-0 ${showVisualizer ? 'shrink-0' : 'flex-1'}`}>
         <Gallery
           images={images}
           onSelect={onSelectImage}
-          selectedId={null}
+          selectedId={selectedItem?.id || null}
           isProcessing={!!isProcessing}
-          viewMode="grid"
+          viewMode={showVisualizer ? 'strip' : 'grid'}
           onClear={handleClear}
           onUpdateItems={setImages}
           onRunAll={onRunAll}
