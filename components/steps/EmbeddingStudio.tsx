@@ -136,10 +136,10 @@ const EmbeddingStudio: React.FC<EmbeddingStudioProps> = ({
               <span className="text-sm font-bold">Cluster Analysis</span>
               <span className="text-[10px] text-gray-500 font-medium">Unsupervised Learning</span>
             </div>
-            {showClustering ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+            {showClustering ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
 
-          <div className={`transition-all duration-300 ease-in-out overflow-hidden ${showClustering ? 'max-h-[70dvh] opacity-100' : 'max-h-0 opacity-0'}`}>
+          <div className={`transition-all duration-300 ease-in-out overflow-hidden ${showClustering ? 'max-h-[60dvh] opacity-100' : 'max-h-0 opacity-0'}`}>
             <div className="border border-t-0 border-gray-700 rounded-b-xl overflow-hidden" style={{ height: '60dvh' }}>
               <div className="h-full overflow-y-auto p-2">
                 <ClusteringView {...clusteringProps} />
