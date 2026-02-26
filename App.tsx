@@ -4,11 +4,10 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import Sidebar from './components/Sidebar';
 import ModelSetup from './components/steps/ModelSetup';
 import DatasetUpload from './components/steps/DatasetUpload';
-import EmbeddingStudio from './components/steps/EmbeddingStudio';
+import ClusteringView from './components/ClusteringView';
 import ScatterView3D from './components/steps/ScatterView3D';
 
 import { ModelConfig, ModelSource, ProcessingStatus, InferenceResult, LogEntry, GalleryItem, AppStep, ResizeMethod, PadStyle } from './types';
-// ClusteringView is no longer a separate step - it's rendered inside EmbeddingStudio
 import { DEFAULT_REMOTE_ONNX_FILE, loadModel, runInference as runDinoInference, type ModelDownloadProgressEntry } from './services/dinoService';
 import { runClassicalInference } from './services/classicalService';
 import { generateThumbnail } from './utils/imageProcessing';
@@ -417,7 +416,7 @@ const App: React.FC = () => {
   // Auto-run inference when selecting an item that hasn't been processed
   useEffect(() => {
     if (
-      currentStep === AppStep.EMBED &&
+      currentStep === AppStep.DATASET &&
       status === 'ready' &&
       selectedItem &&
       !selectedItem.result &&
@@ -529,15 +528,16 @@ const App: React.FC = () => {
   }, [isStandalonePwa]);
 
   useEffect(() => {
-    if (currentStep !== AppStep.EMBED) {
+    if (currentStep !== AppStep.CLUSTER) {
       setLogProgress(null);
     }
   }, [currentStep]);
   
+  const clusteringDone = embeddingsReady && galleryImages.some(i => i.clusterLabel !== undefined);
   const completedSteps = [
     modelReady,          // Init
-    datasetReady,        // Dataset
-    embeddingsReady,     // Embed (includes clustering)
+    embeddingsReady,     // Dataset (includes embed)
+    clusteringDone,      // Cluster
     false                // Visualize (Always explorable)
   ];
 
@@ -578,32 +578,24 @@ const App: React.FC = () => {
               onStopRun={handleStopRun}
               isProcessing={status === 'batch_processing' || status === 'processing'}
               onEmbeddingsImported={handleEmbeddingsImported}
-            />
-          )}
-
-          {currentStep === AppStep.EMBED && (
-            <EmbeddingStudio 
-              images={galleryImages}
-              setImages={setGalleryImages}
               selectedItem={selectedItem}
-              onSelect={handleGallerySelect}
               result={result}
               imageSrc={imageSrc}
-              isProcessing={status === 'processing' || status === 'batch_processing'}
-              onRunAll={handleRunAll}
-              onStopRun={handleStopRun}
               preprocessingConfig={config.preprocessing}
               globalPcaSamples={globalPcaSamples}
               onBuildGlobalPca={() => rebuildGlobalPcaSamples('manual refresh')}
               globalPcaSnapshotAt={globalPcaSnapshotAt}
-              clusteringProps={{
-                items: galleryImages,
-                onUpdateItems: setGalleryImages,
-                isProcessing: status === 'clustering',
-                setIsProcessing: (val) => setStatus(val ? 'clustering' : 'ready'),
-                onLog: addLog,
-                onProgressUpdate: setLogProgress,
-              }}
+            />
+          )}
+
+          {currentStep === AppStep.CLUSTER && (
+            <ClusteringView 
+              items={galleryImages}
+              onUpdateItems={setGalleryImages}
+              isProcessing={status === 'clustering'}
+              setIsProcessing={(val) => setStatus(val ? 'clustering' : 'ready')}
+              onLog={addLog}
+              onProgressUpdate={setLogProgress}
             />
           )}
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { AppStep } from '../types';
-import { Cpu, Image, Layers, Orbit, Check, ArrowRight, Github } from 'lucide-react';
+import { Cpu, Image, Network, Orbit, Check, ArrowRight, Github } from 'lucide-react';
 
 interface SidebarProps {
   currentStep: AppStep;
@@ -11,8 +11,8 @@ interface SidebarProps {
 
 const STEPS = [
   { id: AppStep.INITIALIZE, label: 'Initialize', icon: Cpu, desc: 'Model Setup' },
-  { id: AppStep.DATASET, label: 'Dataset', icon: Image, desc: 'Import Images' },
-  { id: AppStep.EMBED, label: 'Embed', icon: Layers, desc: 'Inference & Clustering' },
+  { id: AppStep.DATASET, label: 'Dataset', icon: Image, desc: 'Import & Embed' },
+  { id: AppStep.CLUSTER, label: 'Cluster', icon: Network, desc: 'Analysis' },
   { id: AppStep.VISUALIZE, label: 'Visualize', icon: Orbit, desc: '3D Scatter' },
 ];
 

@@ -4,18 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { GalleryItem, InferenceResult, PreprocessingConfig } from '../../types';
 import Visualizer from '../Visualizer';
 import Gallery from '../Gallery';
-import ClusteringView from '../ClusteringView';
 import { processImageForDisplay } from '../../utils/imageProcessing';
-import { Network, ChevronUp, ChevronDown } from 'lucide-react';
-
-interface ClusteringViewProps {
-  items: GalleryItem[];
-  onUpdateItems: (items: GalleryItem[]) => void;
-  isProcessing: boolean;
-  setIsProcessing: (val: boolean) => void;
-  onLog?: (message: string, type?: 'info' | 'success' | 'error') => void;
-  onProgressUpdate?: (progress: { mode: 'cluster' | 'tune'; value: number; message: string } | null) => void;
-}
 
 interface EmbeddingStudioProps {
   images: GalleryItem[];
@@ -31,7 +20,6 @@ interface EmbeddingStudioProps {
   globalPcaSamples: number[][];
   onBuildGlobalPca: () => void;
   globalPcaSnapshotAt: number | null;
-  clusteringProps?: ClusteringViewProps;
 }
 
 const EmbeddingStudio: React.FC<EmbeddingStudioProps> = ({ 
@@ -47,11 +35,9 @@ const EmbeddingStudio: React.FC<EmbeddingStudioProps> = ({
   preprocessingConfig,
   globalPcaSamples,
   onBuildGlobalPca,
-  globalPcaSnapshotAt,
-  clusteringProps
+  globalPcaSnapshotAt
 }) => {
   const [processedImageSrc, setProcessedImageSrc] = useState<string | null>(null);
-  const [showClustering, setShowClustering] = useState(false);
 
   // Auto-generate processed image URL for visualization whenever selection or config changes
   useEffect(() => {
@@ -65,6 +51,11 @@ const EmbeddingStudio: React.FC<EmbeddingStudioProps> = ({
         return;
       }
 
+      // If we already have a result, we should strictly assume the model used the config at that time.
+      // However, for the purpose of this studio "playground", showing the CURRENT config applied 
+      // allows users to see what "would" happen or what "did" happen if config hasn't changed.
+      // Ideally, the GalleryItem would store the preprocessing config used at inference time.
+      // For now, we generate based on current global config to give instant feedback on "Crop vs Pad".
       try {
         const url = await processImageForDisplay(selectedItem.file, preprocessingConfig);
         if (active) {
@@ -86,7 +77,9 @@ const EmbeddingStudio: React.FC<EmbeddingStudioProps> = ({
   return (
     <div className="flex flex-col h-full gap-4">
       {/* Visualizer Area (Hero) */}
-      <div className={`min-h-0 bg-gray-900 border border-gray-800 rounded-xl overflow-hidden relative shadow-2xl ${showClustering ? 'h-48 md:h-64 shrink-0' : 'flex-1'}`}>
+      <div className="flex-1 min-h-0 bg-gray-900 border border-gray-800 rounded-xl overflow-hidden relative shadow-2xl">
+         {/* We pass processedImageSrc if available, otherwise fallback to raw imageSrc */}
+         {/* Only render when not loading to prevent flash */}
          <Visualizer 
            imageSrc={processedImageSrc || imageSrc} 
            result={result} 
@@ -108,6 +101,7 @@ const EmbeddingStudio: React.FC<EmbeddingStudioProps> = ({
 
       {/* Action Bar & Gallery */}
       <div className="flex flex-col gap-4 shrink-0">
+          {/* Gallery Strip */}
           <Gallery 
             images={images} 
             onSelect={onSelect} 
@@ -119,35 +113,6 @@ const EmbeddingStudio: React.FC<EmbeddingStudioProps> = ({
             onUpdateItems={setImages}
           />
       </div>
-
-      {/* Clustering Tool - Expandable/Collapsible */}
-      {clusteringProps && (
-        <div className="flex flex-col shrink-0">
-          <button
-            onClick={() => setShowClustering(!showClustering)}
-            className={`flex items-center justify-between w-full px-4 py-2.5 rounded-t-xl border transition-colors ${
-              showClustering
-                ? 'bg-gray-900 border-gray-700 text-white'
-                : 'bg-gray-900/50 border-gray-800 text-gray-400 hover:text-white hover:border-gray-700 rounded-b-xl'
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <Network className="w-4 h-4 text-accent-500" />
-              <span className="text-sm font-bold">Cluster Analysis</span>
-              <span className="text-[10px] text-gray-500 font-medium">Unsupervised Learning</span>
-            </div>
-            {showClustering ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-          </button>
-
-          <div className={`transition-all duration-300 ease-in-out overflow-hidden ${showClustering ? 'max-h-[60dvh] opacity-100' : 'max-h-0 opacity-0'}`}>
-            <div className="border border-t-0 border-gray-700 rounded-b-xl overflow-hidden" style={{ height: '60dvh' }}>
-              <div className="h-full overflow-y-auto p-2">
-                <ClusteringView {...clusteringProps} />
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

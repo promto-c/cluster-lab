@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { GalleryItem } from '../../types';
+import { GalleryItem, InferenceResult, PreprocessingConfig } from '../../types';
 import Gallery from '../Gallery';
-import { ImagePlus, Loader2, Database, ChevronDown, Images } from 'lucide-react';
+import Visualizer from '../Visualizer';
+import { processImageForDisplay, generateThumbnail } from '../../utils/imageProcessing';
+import { ImagePlus, Loader2, Database, ChevronDown, ChevronUp, Images, Layers } from 'lucide-react';
 import { Button } from '../Button';
-import { generateThumbnail } from '../../utils/imageProcessing';
 import useMediaQuery from '../../utils/useMediaQuery';
 import FileFolderPickerActions from '../FileFolderPickerActions';
 
@@ -16,6 +17,14 @@ interface DatasetUploadProps {
   onStopRun?: () => void;
   isProcessing?: boolean;
   onEmbeddingsImported?: (items: GalleryItem[], matchCount: number) => void;
+  // Visualizer props (from merged EmbeddingStudio)
+  selectedItem?: GalleryItem | null;
+  result?: InferenceResult | null;
+  imageSrc?: string | null;
+  preprocessingConfig?: PreprocessingConfig;
+  globalPcaSamples?: number[][];
+  onBuildGlobalPca?: () => void;
+  globalPcaSnapshotAt?: number | null;
 }
 
 interface ExampleDatasetButtonsProps {
@@ -253,14 +262,46 @@ const DatasetUpload: React.FC<DatasetUploadProps> = ({
   onStopRun,
   isProcessing,
   onEmbeddingsImported,
+  selectedItem,
+  result,
+  imageSrc,
+  preprocessingConfig,
+  globalPcaSamples,
+  onBuildGlobalPca,
+  globalPcaSnapshotAt,
 }) => {
   const isMobile = useMediaQuery('(max-width: 767px)');
   const [loadingExample, setLoadingExample] = useState<string | null>(null);
   const [exampleCount, setExampleCount] = useState(12);
+  const [showVisualizer, setShowVisualizer] = useState(false);
+  const [processedImageSrc, setProcessedImageSrc] = useState<string | null>(null);
 
   const filesInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const embeddingsInputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-generate processed image URL for visualization whenever selection or config changes
+  useEffect(() => {
+    let active = true;
+    
+    const generatePreview = async () => {
+      if (!selectedItem || !preprocessingConfig) {
+        if (active) setProcessedImageSrc(null);
+        return;
+      }
+
+      try {
+        const url = await processImageForDisplay(selectedItem.file, preprocessingConfig);
+        if (active) setProcessedImageSrc(url);
+      } catch (e) {
+        console.error("Failed to generate preview", e);
+        if (active) setProcessedImageSrc(selectedItem.url);
+      }
+    };
+
+    generatePreview();
+    return () => { active = false; };
+  }, [selectedItem, preprocessingConfig]);
 
   const openFilesPicker = () => {
     filesInputRef.current?.click();
@@ -481,11 +522,11 @@ const DatasetUpload: React.FC<DatasetUploadProps> = ({
       </div>
 
       {/* Main Grid Area */}
-      <div className="flex-1 min-h-0">
+      <div className={`min-h-0 ${showVisualizer ? 'shrink-0 max-h-[40%]' : 'flex-1'}`}>
         <Gallery
           images={images}
           onSelect={onSelectImage}
-          selectedId={null}
+          selectedId={selectedItem?.id || null}
           isProcessing={!!isProcessing}
           viewMode="grid"
           onClear={handleClear}
@@ -498,6 +539,50 @@ const DatasetUpload: React.FC<DatasetUploadProps> = ({
           importEmbeddingsDisabled={images.length === 0 || !!isProcessing}
         />
       </div>
+
+      {/* Embedding Visualizer - Expandable/Collapsible */}
+      {preprocessingConfig && (
+        <div className="flex flex-col shrink-0">
+          <button
+            onClick={() => setShowVisualizer(!showVisualizer)}
+            className={`flex items-center justify-between w-full px-4 py-2.5 rounded-t-xl border transition-colors ${
+              showVisualizer
+                ? 'bg-gray-900 border-gray-700 text-white'
+                : 'bg-gray-900/50 border-gray-800 text-gray-400 hover:text-white hover:border-gray-700 rounded-b-xl'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <Layers className="w-4 h-4 text-accent-500" />
+              <span className="text-sm font-bold">Embedding Visualizer</span>
+              <span className="text-[10px] text-gray-500 font-medium">Patch-level Feature View</span>
+            </div>
+            {showVisualizer ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
+
+          <div className={`transition-all duration-300 ease-in-out overflow-hidden ${showVisualizer ? 'max-h-[60dvh] opacity-100' : 'max-h-0 opacity-0'}`}>
+            <div className="border border-t-0 border-gray-700 rounded-b-xl overflow-hidden" style={{ height: '50dvh' }}>
+              <div className="h-full relative">
+                <Visualizer
+                  imageSrc={processedImageSrc || imageSrc || null}
+                  result={result || null}
+                  isProcessing={!!isProcessing}
+                  globalPcaSamples={globalPcaSamples || []}
+                  onBuildGlobalPca={onBuildGlobalPca || (() => {})}
+                  globalPcaSnapshotAt={globalPcaSnapshotAt ?? null}
+                />
+                {!selectedItem && (
+                  <div className="absolute top-2 left-2 md:top-4 md:left-4 bg-gray-900/80 backdrop-blur border border-gray-700 p-2.5 md:p-3 rounded-lg max-w-[15rem] md:max-w-xs pointer-events-none">
+                    <h3 className="text-xs md:text-sm font-bold text-white mb-1">Feature Extraction</h3>
+                    <p className="text-[11px] md:text-xs text-gray-400">
+                      Select an image from the gallery above to visualize its patch embeddings as a 2D overlay.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

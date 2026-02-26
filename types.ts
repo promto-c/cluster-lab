@@ -9,7 +9,7 @@ export enum ModelSource {
 export enum AppStep {
   INITIALIZE = 0,
   DATASET = 1,
-  EMBED = 2,
+  CLUSTER = 2,
   VISUALIZE = 3
 }
 
