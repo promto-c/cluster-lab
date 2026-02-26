@@ -559,8 +559,8 @@ const DatasetUpload: React.FC<DatasetUploadProps> = ({
             {showVisualizer ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
 
-          <div className={`transition-all duration-300 ease-in-out overflow-hidden ${showVisualizer ? 'max-h-[60dvh] opacity-100' : 'max-h-0 opacity-0'}`}>
-            <div className="border border-t-0 border-gray-700 rounded-b-xl overflow-hidden" style={{ height: '50dvh' }}>
+          <div className={`transition-all duration-300 ease-in-out overflow-hidden ${showVisualizer ? 'flex-1 max-h-[50dvh] opacity-100' : 'max-h-0 opacity-0'}`}>
+            <div className="border border-t-0 border-gray-700 rounded-b-xl overflow-hidden h-full" style={{ maxHeight: '50dvh' }}>
               <div className="h-full relative">
                 <Visualizer
                   imageSrc={processedImageSrc || imageSrc || null}
