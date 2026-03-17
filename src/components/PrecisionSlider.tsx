@@ -59,13 +59,7 @@ const valueToPercent = (value: number, min: number, max: number): number => {
   return ((clamp(value, min, max) - min) / (max - min)) * 100;
 };
 
-const pointerToValue = (
-  clientX: number,
-  rect: DOMRect,
-  min: number,
-  max: number,
-  step: number
-): number => {
+const pointerToValue = (clientX: number, rect: DOMRect, min: number, max: number, step: number): number => {
   if (max <= min) return min;
   const ratio = clamp((clientX - rect.left) / Math.max(rect.width, 1), 0, 1);
   const raw = min + ratio * (max - min);
@@ -97,96 +91,108 @@ const PrecisionSlider: React.FC<PrecisionSliderProps> = ({
 
   const valuePct = React.useMemo(() => valueToPercent(value, min, max), [value, min, max]);
 
-  const commitValue = React.useCallback((next: number): number => {
-    const snapped = snapToStep(next, min, step);
-    const clamped = clamp(snapped, min, max);
-    if (clamped === committedValueRef.current) return clamped;
-    committedValueRef.current = clamped;
-    onChange(clamped);
-    return clamped;
-  }, [max, min, onChange, step]);
+  const commitValue = React.useCallback(
+    (next: number): number => {
+      const snapped = snapToStep(next, min, step);
+      const clamped = clamp(snapped, min, max);
+      if (clamped === committedValueRef.current) return clamped;
+      committedValueRef.current = clamped;
+      onChange(clamped);
+      return clamped;
+    },
+    [max, min, onChange, step],
+  );
 
   const releaseDrag = React.useCallback(() => {
     dragRef.current = null;
     setPrecisionScale(1);
   }, []);
 
-  const handlePointerDown = React.useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    if (event.pointerType !== 'touch' && event.button !== 0) return;
+  const handlePointerDown = React.useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      if (event.pointerType !== 'touch' && event.button !== 0) return;
 
-    const slider = sliderRef.current;
-    if (!slider) return;
+      const slider = sliderRef.current;
+      if (!slider) return;
 
-    const rect = slider.getBoundingClientRect();
-    const initialValue = pointerToValue(event.clientX, rect, min, max, step);
-    const committedValue = commitValue(initialValue);
+      const rect = slider.getBoundingClientRect();
+      const initialValue = pointerToValue(event.clientX, rect, min, max, step);
+      const committedValue = commitValue(initialValue);
 
-    dragRef.current = {
-      pointerId: event.pointerId,
-      lastX: event.clientX,
-      currentValue: committedValue,
-      centerY: rect.top + rect.height / 2,
-      range: max - min,
-      trackWidth: Math.max(rect.width, 1),
-      precisionThreshold: Math.max(rect.height * thresholdScale, 1),
-    };
+      dragRef.current = {
+        pointerId: event.pointerId,
+        lastX: event.clientX,
+        currentValue: committedValue,
+        centerY: rect.top + rect.height / 2,
+        range: max - min,
+        trackWidth: Math.max(rect.width, 1),
+        precisionThreshold: Math.max(rect.height * thresholdScale, 1),
+      };
 
-    setPrecisionScale(1);
-    event.currentTarget.setPointerCapture(event.pointerId);
-    event.preventDefault();
-  }, [commitValue, max, min, step, thresholdScale]);
+      setPrecisionScale(1);
+      event.currentTarget.setPointerCapture(event.pointerId);
+      event.preventDefault();
+    },
+    [commitValue, max, min, step, thresholdScale],
+  );
 
-  const handlePointerMove = React.useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    const drag = dragRef.current;
-    if (!drag || drag.pointerId !== event.pointerId) return;
+  const handlePointerMove = React.useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      const drag = dragRef.current;
+      if (!drag || drag.pointerId !== event.pointerId) return;
 
-    const perpendicularDistance = Math.abs(event.clientY - drag.centerY);
-    const distanceScale = perpendicularDistance <= drag.precisionThreshold
-      ? 1
-      : clamp(
-          Math.pow(drag.precisionThreshold / perpendicularDistance, precisionPower),
-          minPrecisionScale,
-          1
-        );
+      const perpendicularDistance = Math.abs(event.clientY - drag.centerY);
+      const distanceScale =
+        perpendicularDistance <= drag.precisionThreshold
+          ? 1
+          : clamp(Math.pow(drag.precisionThreshold / perpendicularDistance, precisionPower), minPrecisionScale, 1);
 
-    setPrecisionScale(distanceScale);
+      setPrecisionScale(distanceScale);
 
-    const horizontalDelta = event.clientX - drag.lastX;
-    if (horizontalDelta === 0) return;
+      const horizontalDelta = event.clientX - drag.lastX;
+      if (horizontalDelta === 0) return;
 
-    const scaledDelta = (horizontalDelta / drag.trackWidth) * drag.range * distanceScale;
-    const committedValue = commitValue(drag.currentValue + scaledDelta);
+      const scaledDelta = (horizontalDelta / drag.trackWidth) * drag.range * distanceScale;
+      const committedValue = commitValue(drag.currentValue + scaledDelta);
 
-    drag.currentValue = committedValue;
-    drag.lastX = event.clientX;
-  }, [commitValue, minPrecisionScale, precisionPower]);
+      drag.currentValue = committedValue;
+      drag.lastX = event.clientX;
+    },
+    [commitValue, minPrecisionScale, precisionPower],
+  );
 
-  const handlePointerUp = React.useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    const drag = dragRef.current;
-    if (!drag || drag.pointerId !== event.pointerId) return;
+  const handlePointerUp = React.useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      const drag = dragRef.current;
+      if (!drag || drag.pointerId !== event.pointerId) return;
 
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-    releaseDrag();
-  }, [releaseDrag]);
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+      releaseDrag();
+    },
+    [releaseDrag],
+  );
 
-  const handleKeyDown = React.useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
-    let nextValue: number | null = null;
-    const baseStep = event.altKey ? step * fineStepMultiplier : step;
+  const handleKeyDown = React.useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>) => {
+      let nextValue: number | null = null;
+      const baseStep = event.altKey ? step * fineStepMultiplier : step;
 
-    if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') nextValue = value - baseStep;
-    if (event.key === 'ArrowRight' || event.key === 'ArrowUp') nextValue = value + baseStep;
-    if (event.key === 'PageDown') nextValue = value - baseStep * pageStepMultiplier;
-    if (event.key === 'PageUp') nextValue = value + baseStep * pageStepMultiplier;
-    if (event.key === 'Home') nextValue = min;
-    if (event.key === 'End') nextValue = max;
+      if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') nextValue = value - baseStep;
+      if (event.key === 'ArrowRight' || event.key === 'ArrowUp') nextValue = value + baseStep;
+      if (event.key === 'PageDown') nextValue = value - baseStep * pageStepMultiplier;
+      if (event.key === 'PageUp') nextValue = value + baseStep * pageStepMultiplier;
+      if (event.key === 'Home') nextValue = min;
+      if (event.key === 'End') nextValue = max;
 
-    if (nextValue === null) return;
+      if (nextValue === null) return;
 
-    event.preventDefault();
-    commitValue(nextValue);
-  }, [commitValue, fineStepMultiplier, max, min, pageStepMultiplier, step, value]);
+      event.preventDefault();
+      commitValue(nextValue);
+    },
+    [commitValue, fineStepMultiplier, max, min, pageStepMultiplier, step, value],
+  );
 
   const style: PrecisionSliderStyle = {
     '--value-pct': `${valuePct}%`,

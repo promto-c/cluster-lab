@@ -34,8 +34,7 @@ type DraggableNumberStyle = React.CSSProperties & {
   '--precision-scale': string;
 };
 
-const joinClasses = (...classes: Array<string | false | undefined>) =>
-  classes.filter(Boolean).join(' ');
+const joinClasses = (...classes: Array<string | false | undefined>) => classes.filter(Boolean).join(' ');
 
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 
@@ -130,23 +129,29 @@ const DraggableNumberInput: React.FC<DraggableNumberInputProps> = ({
   const maxBound = isFiniteNumber(max) ? max : Infinity;
   const stepAnchor = isFiniteNumber(min) ? min : 0;
 
-  const sanitize = React.useCallback((raw: number): number => {
-    if (!Number.isFinite(raw)) {
-      return committedValueRef.current;
-    }
+  const sanitize = React.useCallback(
+    (raw: number): number => {
+      if (!Number.isFinite(raw)) {
+        return committedValueRef.current;
+      }
 
-    const snapped = snapToStep(raw, stepAnchor, safeStep);
-    const rounded = integer ? Math.round(snapped) : snapped;
-    return clamp(rounded, minBound, maxBound);
-  }, [integer, maxBound, minBound, safeStep, stepAnchor]);
+      const snapped = snapToStep(raw, stepAnchor, safeStep);
+      const rounded = integer ? Math.round(snapped) : snapped;
+      return clamp(rounded, minBound, maxBound);
+    },
+    [integer, maxBound, minBound, safeStep, stepAnchor],
+  );
 
-  const formatValue = React.useCallback((next: number): string => {
-    if (!Number.isFinite(next)) return '';
-    if (integer) return String(Math.round(next));
+  const formatValue = React.useCallback(
+    (next: number): string => {
+      if (!Number.isFinite(next)) return '';
+      if (integer) return String(Math.round(next));
 
-    const precision = getStepPrecision(safeStep);
-    return Number(next.toFixed(Math.min(precision + 2, 10))).toString();
-  }, [integer, safeStep]);
+      const precision = getStepPrecision(safeStep);
+      return Number(next.toFixed(Math.min(precision + 2, 10))).toString();
+    },
+    [integer, safeStep],
+  );
 
   const normalizedValue = React.useMemo(() => {
     const fallback = Number.isFinite(minBound) ? minBound : 0;
@@ -163,15 +168,18 @@ const DraggableNumberInput: React.FC<DraggableNumberInputProps> = ({
     }
   }, [formatValue, isDragging, isFocused, normalizedValue]);
 
-  const commitValue = React.useCallback((raw: number): number => {
-    const next = sanitize(raw);
-    const prev = committedValueRef.current;
-    committedValueRef.current = next;
-    if (next !== prev) {
-      onChange(next);
-    }
-    return next;
-  }, [onChange, sanitize]);
+  const commitValue = React.useCallback(
+    (raw: number): number => {
+      const next = sanitize(raw);
+      const prev = committedValueRef.current;
+      committedValueRef.current = next;
+      if (next !== prev) {
+        onChange(next);
+      }
+      return next;
+    },
+    [onChange, sanitize],
+  );
 
   const commitDraft = React.useCallback(() => {
     const parsed = parseDraftNumber(draft);
@@ -184,12 +192,15 @@ const DraggableNumberInput: React.FC<DraggableNumberInputProps> = ({
     setDraft(formatValue(committed));
   }, [commitValue, draft, formatValue]);
 
-  const nudgeValue = React.useCallback((delta: number) => {
-    const parsedDraft = parseDraftNumber(draft);
-    const source = parsedDraft ?? committedValueRef.current;
-    const next = commitValue(source + delta);
-    setDraft(formatValue(next));
-  }, [commitValue, draft, formatValue]);
+  const nudgeValue = React.useCallback(
+    (delta: number) => {
+      const parsedDraft = parseDraftNumber(draft);
+      const source = parsedDraft ?? committedValueRef.current;
+      const next = commitValue(source + delta);
+      setDraft(formatValue(next));
+    },
+    [commitValue, draft, formatValue],
+  );
 
   const releaseDrag = React.useCallback(() => {
     dragRef.current = null;
@@ -197,166 +208,168 @@ const DraggableNumberInput: React.FC<DraggableNumberInputProps> = ({
     setPrecisionScale(1);
   }, []);
 
-  const handleWheel = React.useCallback((event: React.WheelEvent<HTMLDivElement>) => {
-    if (disabled || !isFocused) return;
-    if (event.deltaY === 0) return;
+  const handleWheel = React.useCallback(
+    (event: React.WheelEvent<HTMLDivElement>) => {
+      if (disabled || !isFocused) return;
+      if (event.deltaY === 0) return;
 
-    event.preventDefault();
-
-    const baseStep =
-      safeStep *
-      (event.altKey ? fineStepMultiplier : 1) *
-      (event.shiftKey ? pageStepMultiplier : 1);
-
-    if (!Number.isFinite(baseStep) || baseStep === 0) return;
-
-    wheelAccumulatorRef.current += normalizeWheelDelta(event);
-    const direction = wheelAccumulatorRef.current < 0 ? 1 : -1;
-    const steps = Math.trunc(Math.abs(wheelAccumulatorRef.current));
-    if (steps <= 0) return;
-
-    nudgeValue(direction * baseStep * steps);
-
-    if (wheelAccumulatorRef.current < 0) {
-      wheelAccumulatorRef.current += steps;
-    } else {
-      wheelAccumulatorRef.current -= steps;
-    }
-  }, [
-    disabled,
-    fineStepMultiplier,
-    isFocused,
-    nudgeValue,
-    pageStepMultiplier,
-    safeStep,
-  ]);
-
-  const handlePointerDown = React.useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
-    if (disabled) return;
-    if (event.pointerType !== 'touch' && event.button !== 0) return;
-
-    const handle = event.currentTarget;
-    const rect = handle.getBoundingClientRect();
-    const parsedDraft = parseDraftNumber(draft);
-    const startValue = parsedDraft !== null ? sanitize(parsedDraft) : committedValueRef.current;
-    const committedStart = commitValue(startValue);
-
-    setDraft(formatValue(committedStart));
-    setIsFocused(false);
-    inputRef.current?.blur();
-
-    dragRef.current = {
-      pointerId: event.pointerId,
-      lastX: event.clientX,
-      centerY: rect.top + rect.height / 2,
-      currentValue: committedStart,
-      precisionThreshold: Math.max(rect.height * thresholdScale, 1),
-    };
-
-    setIsDragging(true);
-    setPrecisionScale(1);
-    handle.setPointerCapture(event.pointerId);
-    event.preventDefault();
-  }, [commitValue, disabled, draft, formatValue, sanitize, thresholdScale]);
-
-  const handlePointerMove = React.useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
-    const drag = dragRef.current;
-    if (!drag || drag.pointerId !== event.pointerId) return;
-
-    const verticalDistance = Math.abs(event.clientY - drag.centerY);
-    const precision = verticalDistance <= drag.precisionThreshold
-      ? 1
-      : clamp(
-          Math.pow(drag.precisionThreshold / verticalDistance, precisionPower),
-          minPrecisionScale,
-          1
-        );
-
-    setPrecisionScale(precision);
-
-    const deltaX = event.clientX - drag.lastX;
-    if (deltaX === 0) return;
-
-    const scaledDelta = (deltaX / Math.max(dragPixelsPerStep, 1)) * safeStep * precision;
-    const committed = commitValue(drag.currentValue + scaledDelta);
-
-    drag.currentValue = committed;
-    drag.lastX = event.clientX;
-    setDraft(formatValue(committed));
-  }, [commitValue, dragPixelsPerStep, formatValue, minPrecisionScale, precisionPower, safeStep]);
-
-  const handlePointerUp = React.useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
-    const drag = dragRef.current;
-    if (!drag || drag.pointerId !== event.pointerId) return;
-
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-    releaseDrag();
-  }, [releaseDrag]);
-
-  const handleInputKeyDown = React.useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (disabled) return;
-
-    if (event.key === 'Enter') {
       event.preventDefault();
-      commitDraft();
+
+      const baseStep = safeStep * (event.altKey ? fineStepMultiplier : 1) * (event.shiftKey ? pageStepMultiplier : 1);
+
+      if (!Number.isFinite(baseStep) || baseStep === 0) return;
+
+      wheelAccumulatorRef.current += normalizeWheelDelta(event);
+      const direction = wheelAccumulatorRef.current < 0 ? 1 : -1;
+      const steps = Math.trunc(Math.abs(wheelAccumulatorRef.current));
+      if (steps <= 0) return;
+
+      nudgeValue(direction * baseStep * steps);
+
+      if (wheelAccumulatorRef.current < 0) {
+        wheelAccumulatorRef.current += steps;
+      } else {
+        wheelAccumulatorRef.current -= steps;
+      }
+    },
+    [disabled, fineStepMultiplier, isFocused, nudgeValue, pageStepMultiplier, safeStep],
+  );
+
+  const handlePointerDown = React.useCallback(
+    (event: React.PointerEvent<HTMLButtonElement>) => {
+      if (disabled) return;
+      if (event.pointerType !== 'touch' && event.button !== 0) return;
+
+      const handle = event.currentTarget;
+      const rect = handle.getBoundingClientRect();
+      const parsedDraft = parseDraftNumber(draft);
+      const startValue = parsedDraft !== null ? sanitize(parsedDraft) : committedValueRef.current;
+      const committedStart = commitValue(startValue);
+
+      setDraft(formatValue(committedStart));
+      setIsFocused(false);
       inputRef.current?.blur();
-      return;
-    }
 
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      setDraft(formatValue(committedValueRef.current));
-      inputRef.current?.blur();
-      return;
-    }
+      dragRef.current = {
+        pointerId: event.pointerId,
+        lastX: event.clientX,
+        centerY: rect.top + rect.height / 2,
+        currentValue: committedStart,
+        precisionThreshold: Math.max(rect.height * thresholdScale, 1),
+      };
 
-    const baseStep = event.altKey ? safeStep * fineStepMultiplier : safeStep;
+      setIsDragging(true);
+      setPrecisionScale(1);
+      handle.setPointerCapture(event.pointerId);
+      event.preventDefault();
+    },
+    [commitValue, disabled, draft, formatValue, sanitize, thresholdScale],
+  );
 
-    if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      nudgeValue(baseStep);
-      return;
-    }
-    if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      nudgeValue(-baseStep);
-      return;
-    }
-    if (event.key === 'PageUp') {
-      event.preventDefault();
-      nudgeValue(baseStep * pageStepMultiplier);
-      return;
-    }
-    if (event.key === 'PageDown') {
-      event.preventDefault();
-      nudgeValue(-baseStep * pageStepMultiplier);
-      return;
-    }
-    if (event.key === 'Home' && Number.isFinite(minBound)) {
-      event.preventDefault();
-      const committed = commitValue(minBound);
+  const handlePointerMove = React.useCallback(
+    (event: React.PointerEvent<HTMLButtonElement>) => {
+      const drag = dragRef.current;
+      if (!drag || drag.pointerId !== event.pointerId) return;
+
+      const verticalDistance = Math.abs(event.clientY - drag.centerY);
+      const precision =
+        verticalDistance <= drag.precisionThreshold
+          ? 1
+          : clamp(Math.pow(drag.precisionThreshold / verticalDistance, precisionPower), minPrecisionScale, 1);
+
+      setPrecisionScale(precision);
+
+      const deltaX = event.clientX - drag.lastX;
+      if (deltaX === 0) return;
+
+      const scaledDelta = (deltaX / Math.max(dragPixelsPerStep, 1)) * safeStep * precision;
+      const committed = commitValue(drag.currentValue + scaledDelta);
+
+      drag.currentValue = committed;
+      drag.lastX = event.clientX;
       setDraft(formatValue(committed));
-      return;
-    }
-    if (event.key === 'End' && Number.isFinite(maxBound)) {
-      event.preventDefault();
-      const committed = commitValue(maxBound);
-      setDraft(formatValue(committed));
-    }
-  }, [
-    commitDraft,
-    commitValue,
-    disabled,
-    fineStepMultiplier,
-    formatValue,
-    maxBound,
-    minBound,
-    nudgeValue,
-    pageStepMultiplier,
-    safeStep,
-  ]);
+    },
+    [commitValue, dragPixelsPerStep, formatValue, minPrecisionScale, precisionPower, safeStep],
+  );
+
+  const handlePointerUp = React.useCallback(
+    (event: React.PointerEvent<HTMLButtonElement>) => {
+      const drag = dragRef.current;
+      if (!drag || drag.pointerId !== event.pointerId) return;
+
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+      releaseDrag();
+    },
+    [releaseDrag],
+  );
+
+  const handleInputKeyDown = React.useCallback(
+    (event: React.KeyboardEvent<HTMLInputElement>) => {
+      if (disabled) return;
+
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        commitDraft();
+        inputRef.current?.blur();
+        return;
+      }
+
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setDraft(formatValue(committedValueRef.current));
+        inputRef.current?.blur();
+        return;
+      }
+
+      const baseStep = event.altKey ? safeStep * fineStepMultiplier : safeStep;
+
+      if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        nudgeValue(baseStep);
+        return;
+      }
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        nudgeValue(-baseStep);
+        return;
+      }
+      if (event.key === 'PageUp') {
+        event.preventDefault();
+        nudgeValue(baseStep * pageStepMultiplier);
+        return;
+      }
+      if (event.key === 'PageDown') {
+        event.preventDefault();
+        nudgeValue(-baseStep * pageStepMultiplier);
+        return;
+      }
+      if (event.key === 'Home' && Number.isFinite(minBound)) {
+        event.preventDefault();
+        const committed = commitValue(minBound);
+        setDraft(formatValue(committed));
+        return;
+      }
+      if (event.key === 'End' && Number.isFinite(maxBound)) {
+        event.preventDefault();
+        const committed = commitValue(maxBound);
+        setDraft(formatValue(committed));
+      }
+    },
+    [
+      commitDraft,
+      commitValue,
+      disabled,
+      fineStepMultiplier,
+      formatValue,
+      maxBound,
+      minBound,
+      nudgeValue,
+      pageStepMultiplier,
+      safeStep,
+    ],
+  );
 
   const style: DraggableNumberStyle = {
     '--precision-scale': `${precisionScale}`,
@@ -364,11 +377,7 @@ const DraggableNumberInput: React.FC<DraggableNumberInputProps> = ({
 
   return (
     <div
-      className={joinClasses(
-        'draggable-number',
-        disabled && 'is-disabled',
-        className
-      )}
+      className={joinClasses('draggable-number', disabled && 'is-disabled', className)}
       style={style}
       onWheel={handleWheel}
     >
@@ -398,11 +407,7 @@ const DraggableNumberInput: React.FC<DraggableNumberInputProps> = ({
         aria-label={`${ariaLabel} scrub handle`}
         title={title ?? 'Drag left/right to adjust. Move pointer away vertically for finer control.'}
         disabled={disabled}
-        className={joinClasses(
-          'draggable-number__handle',
-          isDragging && 'is-active',
-          handleClassName
-        )}
+        className={joinClasses('draggable-number__handle', isDragging && 'is-active', handleClassName)}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}

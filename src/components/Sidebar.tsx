@@ -1,5 +1,5 @@
 import React from 'react';
-import { AppStep } from '../types';
+import { AppStep } from '@/types';
 import { Cpu, Image, Network, Orbit, Check, ArrowRight, Github } from 'lucide-react';
 
 interface SidebarProps {
@@ -10,22 +10,34 @@ interface SidebarProps {
 }
 
 const STEPS = [
-  { id: AppStep.INITIALIZE, label: 'Initialize', icon: Cpu, desc: 'Model Setup' },
-  { id: AppStep.DATASET, label: 'Dataset', icon: Image, desc: 'Import & Embed' },
+  {
+    id: AppStep.INITIALIZE,
+    label: 'Initialize',
+    icon: Cpu,
+    desc: 'Model Setup',
+  },
+  { id: AppStep.DATASET, label: 'Embed', icon: Image, desc: 'Import & Embed' },
   { id: AppStep.CLUSTER, label: 'Cluster', icon: Network, desc: 'Analysis' },
-  { id: AppStep.VISUALIZE, label: 'Visualize', icon: Orbit, desc: '3D Scatter' },
+  {
+    id: AppStep.VISUALIZE,
+    label: 'Visualize',
+    icon: Orbit,
+    desc: '3D Scatter',
+  },
 ];
 
 const Sidebar: React.FC<SidebarProps> = ({ currentStep, setStep, completedSteps, hideBrandHeader = false }) => {
   return (
-    <aside className="
+    <aside
+      className="
         w-full md:w-64 
         h-auto md:h-full 
         bg-gray-950 border-t md:border-t-0 md:border-r border-gray-800 
         flex flex-row md:flex-col 
         shrink-0 z-50
         pb-[max(env(safe-area-inset-bottom),0px)] md:pb-0
-    ">
+    "
+    >
       {/* Header - Hidden on Mobile */}
       {!hideBrandHeader && (
         <div className="hidden md:block px-4 py-3 border-b border-gray-800">
@@ -48,58 +60,61 @@ const Sidebar: React.FC<SidebarProps> = ({ currentStep, setStep, completedSteps,
       {/* Navigation */}
       <nav className="flex-1 p-1.5 sm:p-2 md:p-4 flex flex-row md:flex-col justify-around md:justify-start gap-1 md:gap-2 overflow-x-auto md:overflow-y-auto">
         {STEPS.map((step, index) => {
-           const isActive = currentStep === step.id;
-           const isCompleted = completedSteps[index];
-           const isLocked = index > 0 && !completedSteps[index - 1]; // Can't go to step N if N-1 is not done
+          const isActive = currentStep === step.id;
+          const isCompleted = completedSteps[index];
+          const isLocked = index > 0 && !completedSteps[index - 1]; // Can't go to step N if N-1 is not done
 
-           return (
-             <div key={step.id} className="relative group flex-1 md:flex-none">
-                {/* Connector Line - Desktop Only */}
-                {index < STEPS.length - 1 && (
-                  <div className={`hidden md:block absolute left-5 top-10 bottom-0 w-0.5 -z-10 h-6
-                    ${isCompleted ? 'bg-accent-900/50' : 'bg-gray-800/50'}`} 
-                  />
-                )}
-
-                <button
-                  onClick={() => !isLocked && setStep(step.id)}
-                  disabled={isLocked}
-                  className={`
+          return (
+            <div key={step.id} className="relative group flex-1 md:flex-none">
+              <button
+                onClick={() => !isLocked && setStep(step.id)}
+                disabled={isLocked}
+                className={`
                     w-full flex md:flex-row flex-col items-center gap-1 md:gap-4 p-2 md:p-3 rounded-xl transition-all duration-300
-                    ${isActive 
-                       ? 'bg-transparent md:bg-gray-900 md:border md:border-gray-700 md:shadow-xl md:translate-x-1' 
-                       : isLocked 
-                         ? 'opacity-40 cursor-not-allowed' 
-                         : 'hover:bg-gray-800/50 md:hover:bg-gray-900/50 md:hover:translate-x-1'
+                    ${
+                      isActive
+                        ? 'bg-transparent md:bg-gray-900 md:border md:border-gray-700 md:shadow-xl md:translate-x-1'
+                        : isLocked
+                          ? 'opacity-40 cursor-not-allowed'
+                          : 'hover:bg-gray-800/50 md:hover:bg-gray-900/50 md:hover:translate-x-1'
+                    }
+                  `}
+              >
+                <div
+                  className={`relative w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center border-2 transition-colors
+                    ${
+                      isActive
+                        ? 'border-accent-500 bg-accent-500/10 text-accent-400'
+                        : isCompleted
+                          ? 'border-green-500/30 bg-green-500/10 text-green-400'
+                          : 'border-gray-800 bg-gray-900 text-gray-600'
                     }
                   `}
                 >
-                  <div className={`relative w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center border-2 transition-colors
-                    ${isActive 
-                       ? 'border-accent-500 bg-accent-500/10 text-accent-400' 
-                       : isCompleted 
-                         ? 'border-green-500/30 bg-green-500/10 text-green-400'
-                         : 'border-gray-800 bg-gray-900 text-gray-600'
-                    }
-                  `}>
-                    {isCompleted && !isActive ? <Check className="w-4 h-4 md:w-5 md:h-5" /> : <step.icon className="w-4 h-4 md:w-5 md:h-5" />}
-                  </div>
+                  {isCompleted && !isActive ? (
+                    <Check className="w-4 h-4 md:w-5 md:h-5" />
+                  ) : (
+                    <step.icon className="w-4 h-4 md:w-5 md:h-5" />
+                  )}
+                </div>
 
-                  <div className="flex-1 text-center md:text-left">
-                    <span className={`hidden md:block text-xs font-bold uppercase tracking-wider mb-0.5
+                <div className="flex-1 text-center md:text-left">
+                  <span
+                    className={`hidden md:block text-xs font-bold uppercase tracking-wider mb-0.5
                        ${isActive ? 'text-accent-400' : isCompleted ? 'text-green-400' : 'text-gray-500'}
-                    `}>
-                      Step 0{index + 1}
-                    </span>
-                    <span className={`text-[10px] md:text-sm font-semibold ${isActive ? 'text-white' : 'text-gray-400'}`}>
-                      {step.label}
-                    </span>
-                  </div>
+                    `}
+                  >
+                    Step 0{index + 1}
+                  </span>
+                  <span className={`text-[10px] md:text-sm font-semibold ${isActive ? 'text-white' : 'text-gray-400'}`}>
+                    {step.label}
+                  </span>
+                </div>
 
-                  {isActive && <ArrowRight className="hidden md:block w-4 h-4 text-accent-500 animate-pulse" />}
-                </button>
-             </div>
-           );
+                {isActive && <ArrowRight className="hidden md:block w-4 h-4 text-accent-500 animate-pulse" />}
+              </button>
+            </div>
+          );
         })}
       </nav>
 
@@ -110,19 +125,21 @@ const Sidebar: React.FC<SidebarProps> = ({ currentStep, setStep, completedSteps,
           <div className="space-y-1">
             <div className="flex justify-between text-[10px]">
               <span className="text-gray-500">Model</span>
-              <span className={completedSteps[0] ? 'text-green-400' : 'text-gray-600'}>{completedSteps[0] ? 'Ready' : 'Not Loaded'}</span>
+              <span className={completedSteps[0] ? 'text-green-400' : 'text-gray-600'}>
+                {completedSteps[0] ? 'Ready' : 'Not Loaded'}
+              </span>
             </div>
             <div className="flex justify-between text-[10px]">
-               <span className="text-gray-500">Pipeline</span>
-               <span className={completedSteps[1] ? 'text-accent-400' : 'text-gray-600'}>
-                  {completedSteps[1] ? 'Active' : 'Idle'}
-               </span>
+              <span className="text-gray-500">Pipeline</span>
+              <span className={completedSteps[1] ? 'text-accent-400' : 'text-gray-600'}>
+                {completedSteps[1] ? 'Active' : 'Idle'}
+              </span>
             </div>
           </div>
         </div>
-        
+
         {/* GitHub Badge */}
-        <a 
+        <a
           href="https://github.com/promto-c/cluster-lab"
           target="_blank"
           rel="noopener noreferrer"
@@ -131,7 +148,9 @@ const Sidebar: React.FC<SidebarProps> = ({ currentStep, setStep, completedSteps,
           <Github className="w-4 h-4 text-gray-600 group-hover:text-white transition-colors" />
           <div className="flex flex-col leading-none">
             <span className="text-[9px] text-gray-500 font-semibold uppercase mb-0.5">Developed by</span>
-            <span className="text-[11px] text-gray-400 font-bold group-hover:text-accent-400 transition-colors">@promto-c</span>
+            <span className="text-[11px] text-gray-400 font-bold group-hover:text-accent-400 transition-colors">
+              @promto-c
+            </span>
           </div>
         </a>
       </div>

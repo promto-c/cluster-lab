@@ -1,12 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { GalleryItem, InferenceResult, PreprocessingConfig } from '../../types';
-import Gallery from '../Gallery';
-import Visualizer from '../Visualizer';
-import { processImageForDisplay, generateThumbnail } from '../../utils/imageProcessing';
+import { GalleryItem, InferenceResult, PreprocessingConfig } from '@/types';
+import Gallery from '@/components/Gallery';
+import Visualizer from '@/components/Visualizer';
+import HeaderBar from '@/components/HeaderBar';
+import { processImageForDisplay, generateThumbnail } from '@/utils/imageProcessing';
 import { ImagePlus, Loader2, Database, ChevronDown, ChevronUp, Images, Layers } from 'lucide-react';
-import { Button } from '../Button';
-import useMediaQuery from '../../utils/useMediaQuery';
-import FileFolderPickerActions from '../FileFolderPickerActions';
+import { Button } from '@/components/Button';
+import useMediaQuery from '@/utils/useMediaQuery';
+import FileFolderPickerActions from '@/components/FileFolderPickerActions';
 
 interface DatasetUploadProps {
   images: GalleryItem[];
@@ -144,20 +145,23 @@ const DatasetExamplesControl: React.FC<DatasetExamplesControlProps> = ({
     <div className="bg-gray-950/95 border border-gray-800 rounded-xl shadow-2xl overflow-hidden">
       {/* Header */}
       <div className="px-3 py-2 border-b border-gray-800/70 flex items-center justify-between gap-3">
-
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-600">
-            Count
-          </span>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-600">Count</span>
           <div className="relative">
             <select
               value={exampleCount}
               onChange={(e) => setExampleCount(Number(e.target.value))}
               className="bg-transparent text-[11px] font-bold text-gray-300 appearance-none pr-4 pl-1 cursor-pointer focus:outline-none hover:text-white"
             >
-              <option value={4} className="bg-gray-900">4</option>
-              <option value={8} className="bg-gray-900">8</option>
-              <option value={12} className="bg-gray-900">12</option>
+              <option value={4} className="bg-gray-900">
+                4
+              </option>
+              <option value={8} className="bg-gray-900">
+                8
+              </option>
+              <option value={12} className="bg-gray-900">
+                12
+              </option>
             </select>
             <ChevronDown className="w-3 h-3 text-gray-600 absolute right-0 top-1.5 pointer-events-none" />
           </div>
@@ -228,11 +232,7 @@ const DatasetExamplesControl: React.FC<DatasetExamplesControlProps> = ({
           <Database className="w-3.5 h-3.5 text-gray-500" />
           Examples
         </span>
-        <ChevronDown
-          className={`w-3.5 h-3.5 text-gray-500 transition-transform ${
-            open ? 'rotate-180' : ''
-          }`}
-        />
+        <ChevronDown className={`w-3.5 h-3.5 text-gray-500 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && (
@@ -244,9 +244,7 @@ const DatasetExamplesControl: React.FC<DatasetExamplesControlProps> = ({
             onClick={() => setOpen(false)}
             aria-label="Close"
           />
-          <div className="absolute right-0 mt-2 z-50">
-            {panel}
-          </div>
+          <div className="absolute right-0 mt-2 z-50">{panel}</div>
         </>
       )}
     </div>
@@ -283,7 +281,7 @@ const DatasetUpload: React.FC<DatasetUploadProps> = ({
   // Auto-generate processed image URL for visualization whenever selection or config changes
   useEffect(() => {
     let active = true;
-    
+
     const generatePreview = async () => {
       if (!selectedItem || !preprocessingConfig) {
         if (active) setProcessedImageSrc(null);
@@ -294,13 +292,15 @@ const DatasetUpload: React.FC<DatasetUploadProps> = ({
         const url = await processImageForDisplay(selectedItem.file, preprocessingConfig);
         if (active) setProcessedImageSrc(url);
       } catch (e) {
-        console.error("Failed to generate preview", e);
+        console.error('Failed to generate preview', e);
         if (active) setProcessedImageSrc(selectedItem.url);
       }
     };
 
     generatePreview();
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, [selectedItem, preprocessingConfig]);
 
   const openFilesPicker = () => {
@@ -337,7 +337,7 @@ const DatasetUpload: React.FC<DatasetUploadProps> = ({
         }
 
         let matchCount = 0;
-        const newImages = images.map(img => {
+        const newImages = images.map((img) => {
           // Match logic: Try matching by 'name' or 'id' in the JSON
           const match = data.find((d: any) => d.name === img.name || d.id === img.name);
 
@@ -382,7 +382,7 @@ const DatasetUpload: React.FC<DatasetUploadProps> = ({
 
   const handleClear = () => {
     // Revoke URLs to prevent leak
-    images.forEach(img => {
+    images.forEach((img) => {
       URL.revokeObjectURL(img.url);
       if (img.thumbnailUrl) URL.revokeObjectURL(img.thumbnailUrl);
     });
@@ -446,10 +446,12 @@ const DatasetUpload: React.FC<DatasetUploadProps> = ({
     <div className="flex flex-col h-full gap-4">
       {/* Top Controls */}
       <div className="flex flex-col gap-2 shrink-0">
-        <div className="flex items-center justify-between gap-2 text-xs text-gray-400 bg-gray-950/30 p-2 rounded-lg border border-gray-800/50">
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            {/* Visualizer toggle button at top-left */}
-            {preprocessingConfig && (
+        <HeaderBar
+          icon={Images}
+          title="Curate Dataset"
+          subtitle="Add files, folders, or examples"
+          leftContent={
+            preprocessingConfig ? (
               <button
                 onClick={() => setShowVisualizer(!showVisualizer)}
                 className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg border transition-colors shrink-0 ${
@@ -463,79 +465,65 @@ const DatasetUpload: React.FC<DatasetUploadProps> = ({
                 <span className="text-[10px] font-bold uppercase tracking-wider hidden sm:inline">Visualizer</span>
                 {showVisualizer ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
               </button>
-            )}
+            ) : null
+          }
+          actions={
+            <>
+              {isMobile ? (
+                <div className="mt-2 flex items-center gap-2 flex-wrap">
+                  <DatasetExamplesControl
+                    datasets={EXAMPLE_DATASETS}
+                    loadingExample={loadingExample}
+                    exampleCount={exampleCount}
+                    setExampleCount={setExampleCount}
+                    onLoadExample={loadExample}
+                    mode="popup"
+                  />
 
-            <div className="flex items-center gap-2 pr-2 mr-1 border-r border-gray-800/80 shrink-0">
-              <div className="p-1.5 bg-accent-500/10 rounded-lg">
-                <Images className="w-4 h-4 text-accent-500" />
-              </div>
-              <div className="leading-none">
-                <h2 className="text-sm font-bold text-white">Curate Dataset</h2>
-                <p className="text-[10px] text-gray-500 font-medium mt-0.5">
-                  Add files, folders, or examples
-                </p>
-              </div>
-            </div>
-          </div>
+                  <FileFolderPickerActions onAddFiles={openFilesPicker} onAddFolder={openFolderPicker} />
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 shrink-0">
+                  <DatasetExamplesControl
+                    datasets={EXAMPLE_DATASETS}
+                    loadingExample={loadingExample}
+                    exampleCount={exampleCount}
+                    setExampleCount={setExampleCount}
+                    onLoadExample={loadExample}
+                    mode="inline"
+                  />
 
-          {isMobile ? (
-            <div className="mt-2 flex items-center gap-2 flex-wrap">
-              <DatasetExamplesControl
-                datasets={EXAMPLE_DATASETS}
-                loadingExample={loadingExample}
-                exampleCount={exampleCount}
-                setExampleCount={setExampleCount}
-                onLoadExample={loadExample}
-                mode="popup"
-              />
+                  <div className="w-px h-6 bg-gray-800 mx-1"></div>
 
-              <FileFolderPickerActions onAddFiles={openFilesPicker} onAddFolder={openFolderPicker} />
-            </div>
-          ) : (
-            <div className="flex items-center justify-between gap-2 mt-1">
-              <div className="flex items-center gap-2 shrink-0">
-                <DatasetExamplesControl
-                  datasets={EXAMPLE_DATASETS}
-                  loadingExample={loadingExample}
-                  exampleCount={exampleCount}
-                  setExampleCount={setExampleCount}
-                  onLoadExample={loadExample}
-                  mode="inline"
-                />
+                  <FileFolderPickerActions onAddFiles={openFilesPicker} onAddFolder={openFolderPicker} />
+                </div>
+              )}
+            </>
+          }
+        />
 
-                <div className="w-px h-6 bg-gray-800 mx-1"></div>
-
-                <FileFolderPickerActions
-                  onAddFiles={openFilesPicker}
-                  onAddFolder={openFolderPicker}
-                /> 
-              </div>
-            </div>
-          )}
-
-          <input
-            ref={filesInputRef}
-            type="file"
-            onChange={handleFileChange}
-            className="hidden"
-            accept="image/*"
-            multiple
-          />
-          <input
-            ref={folderInputRef}
-            type="file"
-            {...({ webkitdirectory: '', directory: '' } as any)}
-            onChange={handleFileChange}
-            className="hidden"
-          />
-          <input
-            ref={embeddingsInputRef}
-            type="file"
-            onChange={handleImportEmbeddings}
-            className="hidden"
-            accept=".json"
-          />
-        </div>
+        <input
+          ref={filesInputRef}
+          type="file"
+          onChange={handleFileChange}
+          className="hidden"
+          accept="image/*"
+          multiple
+        />
+        <input
+          ref={folderInputRef}
+          type="file"
+          {...({ webkitdirectory: '', directory: '' } as any)}
+          onChange={handleFileChange}
+          className="hidden"
+        />
+        <input
+          ref={embeddingsInputRef}
+          type="file"
+          onChange={handleImportEmbeddings}
+          className="hidden"
+          accept=".json"
+        />
       </div>
 
       {/* Embedding Visualizer - Shown at top when expanded */}

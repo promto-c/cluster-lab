@@ -27,8 +27,7 @@ type SelectDropdownSection = {
   options: SelectDropdownOption[];
 };
 
-const joinClasses = (...classes: Array<string | undefined | false>) =>
-  classes.filter(Boolean).join(' ');
+const joinClasses = (...classes: Array<string | undefined | false>) => classes.filter(Boolean).join(' ');
 
 const SelectDropdown: React.FC<SelectDropdownProps> = ({
   value,
@@ -43,10 +42,7 @@ const SelectDropdown: React.FC<SelectDropdownProps> = ({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [isOpen, setIsOpen] = useState(false);
 
-  const selectedOption = useMemo(
-    () => options.find(option => option.value === value) || null,
-    [options, value]
-  );
+  const selectedOption = useMemo(() => options.find((option) => option.value === value) || null, [options, value]);
 
   const sections = useMemo<SelectDropdownSection[]>(() => {
     const grouped = new Map<string, SelectDropdownSection>();
@@ -114,13 +110,14 @@ const SelectDropdown: React.FC<SelectDropdownProps> = ({
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         aria-label={ariaLabel}
-        onClick={() => setIsOpen(prev => !prev)}
+        onClick={() => setIsOpen((prev) => !prev)}
         className={`w-full rounded-xl border px-3 py-2.5 text-left transition-colors flex items-center justify-between gap-3
-          ${disabled
-            ? 'bg-gray-900/40 border-gray-800 text-gray-500 cursor-not-allowed'
-            : isOpen
-              ? 'bg-gray-950 border-accent-500 ring-1 ring-accent-500/50'
-              : 'bg-gray-950 border-gray-700 hover:border-gray-600'
+          ${
+            disabled
+              ? 'bg-gray-900/40 border-gray-800 text-gray-500 cursor-not-allowed'
+              : isOpen
+                ? 'bg-gray-950 border-accent-500 ring-1 ring-accent-500/50'
+                : 'bg-gray-950 border-gray-700 hover:border-gray-600'
           }`}
       >
         <div className="min-w-0 flex flex-1 items-center gap-2">
@@ -143,16 +140,13 @@ const SelectDropdown: React.FC<SelectDropdownProps> = ({
         >
           <div className="max-h-64 overflow-y-auto py-1">
             {sections.map((section, sectionIndex) => (
-              <div
-                key={section.key}
-                className={sectionIndex > 0 ? 'mt-1 pt-1 border-t border-gray-800/80' : undefined}
-              >
+              <div key={section.key} className={sectionIndex > 0 ? 'mt-1 pt-1 border-t border-gray-800/80' : undefined}>
                 {section.groupLabel && (
                   <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-500">
                     {section.groupLabel}
                   </p>
                 )}
-                {section.options.map(option => {
+                {section.options.map((option) => {
                   const isSelected = option.value === value;
                   return (
                     <button
@@ -167,11 +161,12 @@ const SelectDropdown: React.FC<SelectDropdownProps> = ({
                         setIsOpen(false);
                       }}
                       className={`w-full px-3 py-2.5 text-left transition-colors
-                        ${option.disabled
-                          ? 'opacity-50 cursor-not-allowed'
-                          : isSelected
-                            ? 'bg-accent-500/10'
-                            : 'hover:bg-gray-900'
+                        ${
+                          option.disabled
+                            ? 'opacity-50 cursor-not-allowed'
+                            : isSelected
+                              ? 'bg-accent-500/10'
+                              : 'hover:bg-gray-900'
                         }`}
                     >
                       <div className="min-w-0 flex w-full items-center gap-2">
@@ -181,9 +176,10 @@ const SelectDropdown: React.FC<SelectDropdownProps> = ({
                         {option.badge && (
                           <span
                             className={`max-w-[5.5rem] shrink-0 inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide truncate
-                              ${isSelected
-                                ? 'border-accent-400/70 bg-accent-500/20 text-accent-200'
-                                : 'border-gray-600 bg-gray-800/80 text-gray-300'
+                              ${
+                                isSelected
+                                  ? 'border-accent-400/70 bg-accent-500/20 text-accent-200'
+                                  : 'border-gray-600 bg-gray-800/80 text-gray-300'
                               }`}
                           >
                             {option.badge}
@@ -191,7 +187,9 @@ const SelectDropdown: React.FC<SelectDropdownProps> = ({
                         )}
                       </div>
                       {option.description && (
-                        <p className={`mt-1 truncate text-[11px] ${isSelected ? 'text-accent-300/80' : 'text-gray-500'}`}>
+                        <p
+                          className={`mt-1 truncate text-[11px] ${isSelected ? 'text-accent-300/80' : 'text-gray-500'}`}
+                        >
                           {option.description}
                         </p>
                       )}

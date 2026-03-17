@@ -1,6 +1,5 @@
-
 // A simple Principal Component Analysis (PCA) implementation
-import { ColormapType } from '../types';
+import { ColormapType } from '@/types';
 
 export interface PCAModel {
   mean: number[];
@@ -21,7 +20,7 @@ export function fitPCA(data: number[][], components: number = 3): PCAModel {
   if (data.length === 0 || data[0].length === 0) return { mean: [], components: [] };
 
   const m = data[0].length;
-  const cleanData = data.filter(row => row.length === m);
+  const cleanData = data.filter((row) => row.length === m);
   if (cleanData.length === 0) return { mean: [], components: [] };
 
   const n = cleanData.length;
@@ -36,11 +35,11 @@ export function fitPCA(data: number[][], components: number = 3): PCAModel {
   }
   for (let j = 0; j < m; j++) mean[j] /= n;
 
-  const centered = cleanData.map(row => row.map((val, j) => val - mean[j]));
+  const centered = cleanData.map((row) => row.map((val, j) => val - mean[j]));
 
   // 2. Compute Principal Components using Power Iteration
   const principalComponents: number[][] = [];
-  let currentData = centered.map(row => [...row]);
+  let currentData = centered.map((row) => [...row]);
 
   for (let k = 0; k < componentCount; k++) {
     // Deterministic Initialization
@@ -48,7 +47,7 @@ export function fitPCA(data: number[][], components: number = 3): PCAModel {
     let eigenvector = new Array(m).fill(0).map((_, i) => Math.sin(i + k * 33));
     let len = Math.sqrt(eigenvector.reduce((a, b) => a + b * b, 0));
     if (len === 0) len = 1;
-    eigenvector = eigenvector.map(x => x / len);
+    eigenvector = eigenvector.map((x) => x / len);
 
     // Power iteration
     // Increased iterations slightly for better convergence on embedding data
@@ -70,7 +69,7 @@ export function fitPCA(data: number[][], components: number = 3): PCAModel {
 
       const mag = Math.sqrt(nextVector.reduce((a, b) => a + b * b, 0));
       if (mag < 1e-6) break;
-      eigenvector = nextVector.map(x => x / mag);
+      eigenvector = nextVector.map((x) => x / mag);
     }
 
     // Sign Canonicalization
@@ -85,7 +84,7 @@ export function fitPCA(data: number[][], components: number = 3): PCAModel {
       }
     }
     if (maxIdx !== -1 && eigenvector[maxIdx] < 0) {
-      eigenvector = eigenvector.map(x => -x);
+      eigenvector = eigenvector.map((x) => -x);
     }
 
     principalComponents.push(eigenvector);
@@ -104,18 +103,22 @@ export function fitPCA(data: number[][], components: number = 3): PCAModel {
   return { mean, components: principalComponents };
 }
 
-export function projectPCA(data: number[][], model: PCAModel, components: number = model.components.length): number[][] {
+export function projectPCA(
+  data: number[][],
+  model: PCAModel,
+  components: number = model.components.length,
+): number[][] {
   if (data.length === 0 || model.components.length === 0 || model.mean.length === 0) return [];
 
   const componentCount = Math.min(components, model.components.length);
   if (componentCount <= 0) return [];
 
   const dim = model.mean.length;
-  const compatibleRows = data.filter(row => row.length === dim);
+  const compatibleRows = data.filter((row) => row.length === dim);
 
-  return compatibleRows.map(row => {
+  return compatibleRows.map((row) => {
     const centered = row.map((val, i) => val - model.mean[i]);
-    return model.components.slice(0, componentCount).map(pc => {
+    return model.components.slice(0, componentCount).map((pc) => {
       let sum = 0;
       for (let i = 0; i < dim; i++) sum += centered[i] * pc[i];
       return sum;
@@ -126,7 +129,7 @@ export function projectPCA(data: number[][], model: PCAModel, components: number
 export function computeChannelRanges(
   data: number[][],
   lowerQuantile: number = 0.01,
-  upperQuantile: number = 0.99
+  upperQuantile: number = 0.99,
 ): ChannelRange[] {
   if (data.length === 0 || data[0].length === 0) return [];
 
@@ -157,20 +160,20 @@ export function extractChannel(data: number[][], index: number): number[][] {
   if (data.length === 0) return [];
   // bound check
   const actualIndex = Math.min(Math.max(0, index), data[0].length - 1);
-  return data.map(row => [row[actualIndex]]);
+  return data.map((row) => [row[actualIndex]]);
 }
 
 // --- Vector Math for Clustering ---
 
 export function dot(a: number[], b: number[]): number {
   let sum = 0;
-  for(let i=0; i<a.length; i++) sum += a[i] * b[i];
+  for (let i = 0; i < a.length; i++) sum += a[i] * b[i];
   return sum;
 }
 
 export function norm(a: number[]): number {
   let sum = 0;
-  for(let i=0; i<a.length; i++) sum += a[i] * a[i];
+  for (let i = 0; i < a.length; i++) sum += a[i] * a[i];
   return Math.sqrt(sum);
 }
 
@@ -179,12 +182,12 @@ export function cosineDistance(a: number[], b: number[]): number {
   const nA = norm(a);
   const nB = norm(b);
   if (nA === 0 || nB === 0) return 1.0;
-  return 1.0 - (d / (nA * nB));
+  return 1.0 - d / (nA * nB);
 }
 
 export function euclideanDistance(a: number[], b: number[]): number {
   let sum = 0;
-  for(let i=0; i<a.length; i++) {
+  for (let i = 0; i < a.length; i++) {
     const diff = a[i] - b[i];
     sum += diff * diff;
   }
@@ -194,7 +197,7 @@ export function euclideanDistance(a: number[], b: number[]): number {
 export function normalizeVector(v: number[]): number[] {
   const n = norm(v);
   if (n === 0) return v;
-  return v.map(x => x / n);
+  return v.map((x) => x / n);
 }
 
 // --- Stats Helpers ---
@@ -225,7 +228,7 @@ export function reduceUMAP(
   dims: number = 3,
   nNeighbors: number = 15,
   minDist: number = 0.1,
-  nEpochs: number = 200
+  nEpochs: number = 200,
 ): number[][] {
   const n = data.length;
   if (n === 0) return [];
@@ -251,7 +254,9 @@ export function reduceUMAP(
     const rho = dists[i][0].d; // Distance to nearest neighbor
     // Binary search for sigma such that sum of exp(-(d-rho)/sigma) ≈ log2(k)
     const target = Math.log2(k);
-    let lo = 1e-10, hi = 1000, mid = 1;
+    let lo = 1e-10,
+      hi = 1000,
+      mid = 1;
     for (let iter = 0; iter < 64; iter++) {
       mid = (lo + hi) / 2;
       let sum = 0;
@@ -291,7 +296,7 @@ export function reduceUMAP(
     Y = computePCA(data, dims);
     // Scale to small range
     for (let d = 0; d < dims; d++) {
-      const col = Y.map(r => r[d]);
+      const col = Y.map((r) => r[d]);
       const mn = Math.min(...col);
       const mx = Math.max(...col);
       const rng = mx - mn || 1;
@@ -317,7 +322,7 @@ export function reduceUMAP(
         distSq += (Y[ei][d] - Y[ej][d]) ** 2;
       }
       const dist = Math.sqrt(distSq) + 1e-4;
-      const gradCoeff = (-2 * a * b * Math.pow(distSq, b / 2 - 1)) / (1 + a * Math.pow(distSq, b)) * w;
+      const gradCoeff = ((-2 * a * b * Math.pow(distSq, b / 2 - 1)) / (1 + a * Math.pow(distSq, b))) * w;
 
       for (let d = 0; d < dims; d++) {
         const grad = gradCoeff * (Y[ei][d] - Y[ej][d]) * lr;
@@ -359,7 +364,7 @@ export function reduceTSNE(
   dims: number = 3,
   perplexity: number = 30,
   nIter: number = 300,
-  learningRate: number = 200
+  learningRate: number = 200,
 ): number[][] {
   const n = data.length;
   if (n === 0) return [];
@@ -385,7 +390,9 @@ export function reduceTSNE(
   const targetEntropy = Math.log(perp);
 
   for (let i = 0; i < n; i++) {
-    let lo = 1e-10, hi = 1e4, beta = 1;
+    let lo = 1e-10,
+      hi = 1e4,
+      beta = 1;
     for (let iter = 0; iter < 50; iter++) {
       beta = (lo + hi) / 2;
       let sum = 0;
@@ -408,7 +415,10 @@ export function reduceTSNE(
     // Set row
     let sum = 0;
     for (let j = 0; j < n; j++) {
-      if (j === i) { P[i * n + j] = 0; continue; }
+      if (j === i) {
+        P[i * n + j] = 0;
+        continue;
+      }
       const val = Math.exp(-D[i * n + j] * beta);
       P[i * n + j] = val;
       sum += val;
@@ -495,28 +505,28 @@ export function reduceTSNE(
 
 export function findElbowIndex(data: number[]): number {
   if (data.length < 3) return 0;
-  
+
   const n = data.length;
   // Define line between first and last point
   const x1 = 0;
   const y1 = data[0];
   const x2 = n - 1;
   const y2 = data[n - 1];
-  
+
   let maxDist = -1;
   let idx = 0;
-  
+
   // y = mx + c => mx - y + c = 0
   // m = (y2-y1)/(x2-x1)
   // Distance from point (x0, y0) to Ax + By + C = 0 is |Ax0 + By0 + C| / sqrt(A^2 + B^2)
   // Eq: (y2-y1)x - (x2-x1)y + x2y1 - y2x1 = 0
-  
+
   const A = y2 - y1;
   const B = -(x2 - x1);
   const C = x2 * y1 - y2 * x1;
-  const den = Math.sqrt(A*A + B*B);
-  
-  for(let i=0; i<n; i++) {
+  const den = Math.sqrt(A * A + B * B);
+
+  for (let i = 0; i < n; i++) {
     const d = Math.abs(A * i + B * data[i] + C) / den;
     if (d > maxDist) {
       maxDist = d;
@@ -531,34 +541,34 @@ export function findElbowIndex(data: number[]): number {
 type RGB = [number, number, number];
 
 // Simplified gradient stops for common colormaps
-const COLOR_STOPS: Record<string, { t: number, color: RGB }[]> = {
+const COLOR_STOPS: Record<string, { t: number; color: RGB }[]> = {
   viridis: [
     { t: 0.0, color: [68, 1, 84] },
     { t: 0.25, color: [59, 82, 139] },
     { t: 0.5, color: [33, 145, 140] },
     { t: 0.75, color: [94, 201, 98] },
-    { t: 1.0, color: [253, 231, 37] }
+    { t: 1.0, color: [253, 231, 37] },
   ],
   inferno: [
     { t: 0.0, color: [0, 0, 4] },
     { t: 0.25, color: [87, 16, 109] },
     { t: 0.5, color: [187, 55, 84] },
     { t: 0.75, color: [249, 142, 9] },
-    { t: 1.0, color: [252, 255, 164] }
+    { t: 1.0, color: [252, 255, 164] },
   ],
   plasma: [
     { t: 0.0, color: [13, 8, 135] },
     { t: 0.25, color: [126, 3, 168] },
     { t: 0.5, color: [204, 71, 120] },
     { t: 0.75, color: [248, 149, 64] },
-    { t: 1.0, color: [240, 249, 33] }
+    { t: 1.0, color: [240, 249, 33] },
   ],
   magma: [
     { t: 0.0, color: [0, 0, 4] },
     { t: 0.25, color: [81, 28, 116] },
     { t: 0.5, color: [183, 55, 121] },
     { t: 0.75, color: [252, 137, 97] },
-    { t: 1.0, color: [252, 253, 191] }
+    { t: 1.0, color: [252, 253, 191] },
   ],
 };
 
@@ -566,22 +576,18 @@ function lerp(start: number, end: number, t: number): number {
   return start + (end - start) * t;
 }
 
-function interpolateColor(value: number, stops: { t: number, color: RGB }[]): RGB {
+function interpolateColor(value: number, stops: { t: number; color: RGB }[]): RGB {
   // Clamp
   if (value <= 0) return stops[0].color;
   if (value >= 1) return stops[stops.length - 1].color;
 
   // Find segment
   for (let i = 0; i < stops.length - 1; i++) {
-    if (value >= stops[i].t && value <= stops[i+1].t) {
-      const t = (value - stops[i].t) / (stops[i+1].t - stops[i].t);
+    if (value >= stops[i].t && value <= stops[i + 1].t) {
+      const t = (value - stops[i].t) / (stops[i + 1].t - stops[i].t);
       const c1 = stops[i].color;
-      const c2 = stops[i+1].color;
-      return [
-        Math.floor(lerp(c1[0], c2[0], t)),
-        Math.floor(lerp(c1[1], c2[1], t)),
-        Math.floor(lerp(c1[2], c2[2], t))
-      ];
+      const c2 = stops[i + 1].color;
+      return [Math.floor(lerp(c1[0], c2[0], t)), Math.floor(lerp(c1[1], c2[1], t)), Math.floor(lerp(c1[2], c2[2], t))];
     }
   }
   return stops[stops.length - 1].color;
@@ -591,10 +597,10 @@ export function mapDataToColors(data: number[][], colormap: ColormapType, channe
   if (data.length === 0) return [];
   const channels = data[0].length;
   const n = data.length;
-  
+
   // Normalize each channel 0-1
   const normalized = data.map(() => new Array(channels).fill(0));
-  
+
   for (let c = 0; c < channels; c++) {
     let min: number;
     let max: number;
@@ -605,47 +611,43 @@ export function mapDataToColors(data: number[][], colormap: ColormapType, channe
     } else {
       // Collect all values for this channel
       const colValues = new Array(n);
-      for(let i=0; i<n; i++) colValues[i] = data[i][c];
-      
+      for (let i = 0; i < n; i++) colValues[i] = data[i][c];
+
       // Sort to find percentiles for robust min/max
       colValues.sort((a, b) => a - b);
-      
+
       // Clip 1% outliers from both ends to improve contrast and consistency
       min = colValues[Math.floor(n * 0.01)] ?? colValues[0];
       max = colValues[Math.floor(n * 0.99)] ?? colValues[n - 1];
 
       if (min === max) {
-         min = colValues[0];
-         max = colValues[n-1];
+        min = colValues[0];
+        max = colValues[n - 1];
       }
     }
 
     let range = max - min;
     if (range < 1e-6) range = 0;
-    
+
     for (let i = 0; i < n; i++) {
       let val = data[i][c];
       // Clamp
       if (val < min) val = min;
       if (val > max) val = max;
-      
+
       normalized[i][c] = range === 0 ? 0.5 : (val - min) / range;
     }
   }
 
   // Map to RGB
-  return normalized.map(row => {
+  return normalized.map((row) => {
     if (colormap === 'rgb' && channels >= 3) {
       // Direct RGB mapping (taking first 3 channels)
-      return [
-        Math.floor(row[0] * 255),
-        Math.floor(row[1] * 255),
-        Math.floor(row[2] * 255)
-      ];
+      return [Math.floor(row[0] * 255), Math.floor(row[1] * 255), Math.floor(row[2] * 255)];
     } else {
       // 1-channel mapping (use first component)
       const val = row[0]; // 0-1
-      
+
       if (colormap === 'grayscale') {
         const gray = Math.floor(val * 255);
         return [gray, gray, gray];

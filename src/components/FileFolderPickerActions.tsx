@@ -7,21 +7,16 @@ interface FileFolderPickerActionsProps {
   className?: string;
 }
 
-const joinClasses = (...classes: Array<string | undefined | false>) =>
-  classes.filter(Boolean).join(' ');
+const joinClasses = (...classes: Array<string | undefined | false>) => classes.filter(Boolean).join(' ');
 
-const FileFolderPickerActions: React.FC<FileFolderPickerActionsProps> = ({
-  onAddFiles,
-  onAddFolder,
-  className,
-}) => {
+const FileFolderPickerActions: React.FC<FileFolderPickerActionsProps> = ({ onAddFiles, onAddFolder, className }) => {
   if (!onAddFiles && !onAddFolder) return null;
 
   return (
     <div
       className={joinClasses(
         'inline-flex items-stretch overflow-hidden rounded-md border border-gray-700 bg-gray-800 text-xs font-medium shadow-sm',
-        className
+        className,
       )}
     >
       {onAddFiles && (

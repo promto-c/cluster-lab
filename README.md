@@ -17,7 +17,7 @@ https://promto-c.github.io/cluster-lab/
 
 ## Features
 
-- 4-step pipeline: `Initialize -> Dataset -> Embed -> Cluster`
+- 4-step pipeline: `Initialize -> Embed -> Cluster -> Visualize`
 - Model sources: Hugging Face (`Xenova/dinov2-small`, `base`, `large`, or custom repo ID), local ONNX model folder, or classical CV descriptors (Color Histogram, LBP, GLCM, HOG)
 - Hugging Face ONNX variant selector (auto-discovers files in `onnx/`, e.g. `model.onnx`, `model_q4.onnx`, `model_quantized.onnx`)
 - Preprocessing controls: `Letterbox Pad` (blur, mirror/reflect, or solid), `Stretch`, `Center Crop`
@@ -69,6 +69,6 @@ When using **Local Folder** mode, include:
 ## Workflow Quick Start
 
 1. **Initialize**: choose model source and preprocessing, then initialize model/algorithms.
-2. **Dataset**: import images (or load examples).
-3. **Embed**: run embeddings and inspect patch features in the visualizer.
-4. **Cluster**: pick algorithm/settings, run clustering, and drill down into sub-clusters.
+2. **Embed**: import images (or load examples) and run embeddings.
+3. **Cluster**: pick algorithm/settings, run clustering, and drill down into sub-clusters.
+4. **Visualize**: explore patch-level features in 3D and inspect clusters.

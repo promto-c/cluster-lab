@@ -2,11 +2,11 @@ import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
-import { GalleryItem, DimReductionMethod } from '../../types';
-import { reducePCA, reduceUMAP, reduceTSNE, normalizeVector } from '../../utils/math';
+import { GalleryItem, DimReductionMethod } from '@/types';
+import { reducePCA, reduceUMAP, reduceTSNE } from '@/utils/math';
 import { Settings2, AlertTriangle, Loader2, RotateCcw } from 'lucide-react';
-import PrecisionSlider from '../PrecisionSlider';
-import useMediaQuery from '../../utils/useMediaQuery';
+import PrecisionSlider from '@/components/PrecisionSlider';
+import useMediaQuery from '@/utils/useMediaQuery';
 
 // JSX intrinsics for react-three-fiber
 declare global {
@@ -67,10 +67,26 @@ declare module 'react' {
 
 // --- Cluster color palette ---
 const CLUSTER_COLORS = [
-  '#6366f1', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6',
-  '#ec4899', '#14b8a6', '#f97316', '#06b6d4', '#84cc16',
-  '#e879f9', '#22d3ee', '#fb923c', '#a78bfa', '#34d399',
-  '#fbbf24', '#f472b6', '#2dd4bf', '#c084fc', '#4ade80',
+  '#6366f1',
+  '#f59e0b',
+  '#10b981',
+  '#ef4444',
+  '#8b5cf6',
+  '#ec4899',
+  '#14b8a6',
+  '#f97316',
+  '#06b6d4',
+  '#84cc16',
+  '#e879f9',
+  '#22d3ee',
+  '#fb923c',
+  '#a78bfa',
+  '#34d399',
+  '#fbbf24',
+  '#f472b6',
+  '#2dd4bf',
+  '#c084fc',
+  '#4ade80',
 ];
 
 const NOISE_COLOR = '#4b5563'; // gray-600
@@ -91,17 +107,17 @@ function getClusterIdentifier(item: GalleryItem): string | number {
 // Get color for hierarchical cluster
 function getHierarchicalClusterColor(item: GalleryItem): string {
   if (item.clusterLabel === undefined || item.clusterLabel < 0) return NOISE_COLOR;
-  
+
   // If hierarchical path exists, hash it to get a consistent color
   if (item.clusterPath && item.clusterPath.length > 0) {
     let hash = 0;
     for (let i = 0; i < item.clusterPath.length; i++) {
-      hash = ((hash << 5) - hash) + item.clusterPath[i];
+      hash = (hash << 5) - hash + item.clusterPath[i];
       hash = hash & hash; // Convert to 32-bit integer
     }
     return CLUSTER_COLORS[Math.abs(hash) % CLUSTER_COLORS.length];
   }
-  
+
   return getClusterColor(item.clusterLabel);
 }
 
@@ -184,13 +200,12 @@ const ThumbnailSprite: React.FC<{
     <group position={position}>
       <sprite
         scale={[size * 1.15, size * 1.15, 1]}
-        onClick={(e: any) => { e.stopPropagation(); onClick(); }}
+        onClick={(e: any) => {
+          e.stopPropagation();
+          onClick();
+        }}
       >
-        <spriteMaterial
-          map={texture}
-          transparent
-          opacity={selected ? 1.0 : 0.85}
-        />
+        <spriteMaterial map={texture} transparent opacity={selected ? 1.0 : 0.85} />
       </sprite>
     </group>
   );
@@ -208,24 +223,22 @@ const DotPoint: React.FC<{
   return (
     <mesh
       position={position}
-      onClick={(e: any) => { e.stopPropagation(); onClick(); }}
+      onClick={(e: any) => {
+        e.stopPropagation();
+        onClick();
+      }}
     >
       <sphereGeometry args={[size * 0.15, 16, 16]} />
-      <meshStandardMaterial
-        color={col}
-        emissive={col}
-        emissiveIntensity={selected ? 0.6 : 0.15}
-        roughness={0.4}
-      />
+      <meshStandardMaterial color={col} emissive={col} emissiveIntensity={selected ? 0.6 : 0.15} roughness={0.4} />
     </mesh>
   );
 };
 
 // --- Auto-fit camera on mount ---
-const AutoFitCamera: React.FC<{ positions: [number, number, number][]; controlsRef: React.RefObject<any> }> = ({
-  positions,
-  controlsRef,
-}) => {
+const AutoFitCamera: React.FC<{
+  positions: [number, number, number][];
+  controlsRef: React.RefObject<any>;
+}> = ({ positions, controlsRef }) => {
   const { camera } = useThree();
   const fitted = useRef(false);
 
@@ -266,7 +279,7 @@ interface ClusterCentroidData {
 const ClusterCentroids: React.FC<{ clusters: ClusterCentroidData[] }> = ({ clusters }) => {
   return (
     <group>
-      {clusters.map(cluster => {
+      {clusters.map((cluster) => {
         const col = new THREE.Color(cluster.color);
 
         // Build line segments: pairs of [centroid, member] for each member
@@ -286,10 +299,7 @@ const ClusterCentroids: React.FC<{ clusters: ClusterCentroidData[] }> = ({ clust
             {/* Centroid sphere */}
             <mesh position={cluster.centroid}>
               <sphereGeometry args={[0.05, 16, 16]} />
-              <meshStandardMaterial
-                color={col}
-                emissive={col}
-              />
+              <meshStandardMaterial color={col} emissive={col} />
             </mesh>
             {/* Lines to children */}
             {cluster.memberPositions.length > 0 && (
@@ -314,7 +324,7 @@ const ClusterCentroids: React.FC<{ clusters: ClusterCentroidData[] }> = ({ clust
 // --- Grid Floor ---
 const FloorGrid: React.FC<{ size: number }> = ({ size }) => {
   return (
-    <gridHelper args={[size, 20, '#27272a', '#18181b']} rotation={[0, 0, 0]} position={[0, -size / 2 * 0.5, 0]} />
+    <gridHelper args={[size, 20, '#27272a', '#18181b']} rotation={[0, 0, 0]} position={[0, (-size / 2) * 0.5, 0]} />
   );
 };
 
@@ -344,13 +354,12 @@ const ScatterView3D: React.FC<ScatterView3DProps> = ({ items, selectedId, onSele
   const controlsRef = useRef<any>(null);
   const prevMethodRef = useRef<DimReductionMethod | null>(null);
 
-  useEffect(() => { setShowControls(!isMobile); }, [isMobile]);
+  useEffect(() => {
+    setShowControls(!isMobile);
+  }, [isMobile]);
 
   // Filter items with embeddings
-  const readyItems = useMemo(
-    () => items.filter(i => i.result?.embedding && i.enabled !== false),
-    [items]
-  );
+  const readyItems = useMemo(() => items.filter((i) => i.result?.embedding && i.enabled !== false), [items]);
 
   // Compute layout when method or data changes
   useEffect(() => {
@@ -375,15 +384,15 @@ const ScatterView3D: React.FC<ScatterView3DProps> = ({ items, selectedId, onSele
     // Run async to not block UI
     const compute = async () => {
       // Yield to paint loading indicator
-      await new Promise(r => setTimeout(r, 50));
+      await new Promise((r) => setTimeout(r, 50));
       if (cancelled) return;
 
-      const embeddings = readyItems.map(i => i.result!.embedding);
+      const embeddings = readyItems.map((i) => i.result!.embedding);
 
       let reduced: number[][];
       if (method === 'raw') {
         // Take first 3 dims or pad
-        reduced = embeddings.map(e => {
+        reduced = embeddings.map((e) => {
           const r = [e[0] || 0, e[1] || 0, e[2] || 0];
           return r;
         });
@@ -403,7 +412,7 @@ const ScatterView3D: React.FC<ScatterView3DProps> = ({ items, selectedId, onSele
         for (const v of r) maxAbs = Math.max(maxAbs, Math.abs(v));
       }
       const scale = maxAbs > 0 ? 10 / maxAbs : 1;
-      const positions: [number, number, number][] = reduced.map(r => [
+      const positions: [number, number, number][] = reduced.map((r) => [
         (r[0] || 0) * scale,
         (r[1] || 0) * scale,
         (r[2] || 0) * scale,
@@ -412,20 +421,22 @@ const ScatterView3D: React.FC<ScatterView3DProps> = ({ items, selectedId, onSele
       if (cancelled) return;
       setLayout({
         positions,
-        itemIds: readyItems.map(i => i.id),
+        itemIds: readyItems.map((i) => i.id),
         method,
       });
       setIsComputing(false);
     };
 
     compute();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [readyItems, method]); // intentionally exclude layout to avoid infinite loops
 
   // Map of id -> item for fast lookup
   const itemMap = useMemo(() => {
     const m = new Map<string, GalleryItem>();
-    items.forEach(i => m.set(i.id, i));
+    items.forEach((i) => m.set(i.id, i));
     return m;
   }, [items]);
 
@@ -469,7 +480,7 @@ const ScatterView3D: React.FC<ScatterView3DProps> = ({ items, selectedId, onSele
       const item = itemMap.get(layout.itemIds[i]);
       if (!item) continue;
       if (item.clusterLabel === undefined || item.clusterLabel < 0) continue; // skip noise
-      
+
       const clusterId = getClusterIdentifier(item);
       if (!groups.has(clusterId)) groups.set(clusterId, { positions: [], item });
       groups.get(clusterId)!.positions.push(layout.positions[i]);
@@ -493,7 +504,7 @@ const ScatterView3D: React.FC<ScatterView3DProps> = ({ items, selectedId, onSele
   const clusterStats = useMemo(() => {
     const labels = new Set<number>();
     let noiseCount = 0;
-    readyItems.forEach(i => {
+    readyItems.forEach((i) => {
       const lbl = i.clusterLabel;
       if (lbl === undefined || lbl < 0) noiseCount++;
       else labels.add(lbl);
@@ -526,9 +537,7 @@ const ScatterView3D: React.FC<ScatterView3DProps> = ({ items, selectedId, onSele
               <AutoFitCamera positions={layout.positions} controlsRef={controlsRef} />
               <FloorGrid size={gridSize} />
 
-              {showCentroids && clusterData.length > 0 && (
-                <ClusterCentroids clusters={clusterData} />
-              )}
+              {showCentroids && clusterData.length > 0 && <ClusterCentroids clusters={clusterData} />}
 
               {layout.positions.map((pos, idx) => {
                 const itemId = layout.itemIds[idx];
@@ -585,7 +594,9 @@ const ScatterView3D: React.FC<ScatterView3DProps> = ({ items, selectedId, onSele
       )}
 
       {/* Controls Panel */}
-      <div className={`absolute top-2 md:top-4 left-2 right-2 md:left-auto md:right-4 md:w-64 bg-gray-900/90 backdrop-blur-md border border-gray-700 rounded-lg shadow-xl transition-all duration-300 z-30 ${showControls ? 'translate-y-0 md:translate-x-0 opacity-100' : 'translate-y-2 md:translate-y-0 md:translate-x-[110%] opacity-0 pointer-events-none'}`}>
+      <div
+        className={`absolute top-2 md:top-4 left-2 right-2 md:left-auto md:right-4 md:w-64 bg-gray-900/90 backdrop-blur-md border border-gray-700 rounded-lg shadow-xl transition-all duration-300 z-30 ${showControls ? 'translate-y-0 md:translate-x-0 opacity-100' : 'translate-y-2 md:translate-y-0 md:translate-x-[110%] opacity-0 pointer-events-none'}`}
+      >
         <div className="p-3 border-b border-gray-700 flex justify-between items-center">
           <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 flex items-center gap-2">
             <Settings2 className="w-4 h-4" /> 3D Scatter Controls
@@ -598,9 +609,11 @@ const ScatterView3D: React.FC<ScatterView3DProps> = ({ items, selectedId, onSele
         <div className="p-4 space-y-4 text-xs max-h-[65dvh] md:max-h-[60vh] overflow-y-auto">
           {/* Dimension Reduction Method */}
           <div>
-            <span className="text-gray-400 block mb-1.5 text-[11px] font-semibold uppercase tracking-wide">Mapping</span>
+            <span className="text-gray-400 block mb-1.5 text-[11px] font-semibold uppercase tracking-wide">
+              Mapping
+            </span>
             <div className="grid grid-cols-4 bg-gray-800 rounded p-1 gap-0.5">
-              {(['raw', 'pca', 'umap', 'tsne'] as DimReductionMethod[]).map(m => (
+              {(['raw', 'pca', 'umap', 'tsne'] as DimReductionMethod[]).map((m) => (
                 <button
                   key={m}
                   onClick={() => setMethod(m)}
@@ -625,14 +638,16 @@ const ScatterView3D: React.FC<ScatterView3DProps> = ({ items, selectedId, onSele
             <label className="flex items-center justify-between cursor-pointer">
               <span className="text-gray-400">Show Thumbnails</span>
               <button
-                onClick={() => setShowThumbnails(v => !v)}
+                onClick={() => setShowThumbnails((v) => !v)}
                 className={`w-9 h-5 rounded-full transition-colors relative ${
                   showThumbnails ? 'bg-accent-500' : 'bg-gray-700'
                 }`}
               >
-                <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${
-                  showThumbnails ? 'translate-x-4' : ''
-                }`} />
+                <div
+                  className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${
+                    showThumbnails ? 'translate-x-4' : ''
+                  }`}
+                />
               </button>
             </label>
 
@@ -640,14 +655,16 @@ const ScatterView3D: React.FC<ScatterView3DProps> = ({ items, selectedId, onSele
             <label className="flex items-center justify-between cursor-pointer">
               <span className="text-gray-400">Centroids &amp; Lines</span>
               <button
-                onClick={() => setShowCentroids(v => !v)}
+                onClick={() => setShowCentroids((v) => !v)}
                 className={`w-9 h-5 rounded-full transition-colors relative ${
                   showCentroids ? 'bg-accent-500' : 'bg-gray-700'
                 }`}
               >
-                <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${
-                  showCentroids ? 'translate-x-4' : ''
-                }`} />
+                <div
+                  className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${
+                    showCentroids ? 'translate-x-4' : ''
+                  }`}
+                />
               </button>
             </label>
 
@@ -662,7 +679,7 @@ const ScatterView3D: React.FC<ScatterView3DProps> = ({ items, selectedId, onSele
                 min={0.3}
                 max={3}
                 step={0.1}
-                onChange={v => setPointSize(v)}
+                onChange={(v) => setPointSize(v)}
                 ariaLabel="Point Size"
                 className="w-full"
               />
@@ -706,26 +723,32 @@ const ScatterView3D: React.FC<ScatterView3DProps> = ({ items, selectedId, onSele
       </div>
 
       {/* Selected item info tooltip */}
-      {selectedId && (() => {
-        const sel = itemMap.get(selectedId);
-        if (!sel) return null;
-        const clusterPath = sel.clusterPath && sel.clusterPath.length > 0 
-          ? sel.clusterPath.join(' → ')
-          : (sel.clusterLabel !== undefined && sel.clusterLabel >= 0 ? String(sel.clusterLabel) : 'Noise');
-        return (
-          <div className="absolute bottom-10 left-4 bg-gray-900/95 backdrop-blur border border-gray-700 rounded-lg p-2 flex items-center gap-2 z-20 max-w-xs pointer-events-none">
-            {(sel.thumbnailUrl || sel.url) && (
-              <img src={sel.thumbnailUrl || sel.url} className="w-10 h-10 rounded object-cover border border-gray-600" alt="" />
-            )}
-            <div className="min-w-0">
-              <p className="text-xs text-white font-medium truncate">{sel.name}</p>
-              <p className="text-[10px] text-gray-500">
-                Cluster: {clusterPath}
-              </p>
+      {selectedId &&
+        (() => {
+          const sel = itemMap.get(selectedId);
+          if (!sel) return null;
+          const clusterPath =
+            sel.clusterPath && sel.clusterPath.length > 0
+              ? sel.clusterPath.join(' → ')
+              : sel.clusterLabel !== undefined && sel.clusterLabel >= 0
+                ? String(sel.clusterLabel)
+                : 'Noise';
+          return (
+            <div className="absolute bottom-10 left-4 bg-gray-900/95 backdrop-blur border border-gray-700 rounded-lg p-2 flex items-center gap-2 z-20 max-w-xs pointer-events-none">
+              {(sel.thumbnailUrl || sel.url) && (
+                <img
+                  src={sel.thumbnailUrl || sel.url}
+                  className="w-10 h-10 rounded object-cover border border-gray-600"
+                  alt=""
+                />
+              )}
+              <div className="min-w-0">
+                <p className="text-xs text-white font-medium truncate">{sel.name}</p>
+                <p className="text-[10px] text-gray-500">Cluster: {clusterPath}</p>
+              </div>
             </div>
-          </div>
-        );
-      })()}
+          );
+        })()}
     </div>
   );
 };

@@ -64,35 +64,10 @@
         background: #52525b; 
       }
     </style>
-  <script type="importmap">
-{
-  "imports": {
-    "react": "https://esm.sh/react@18.3.1",
-    "react-dom": "https://esm.sh/react-dom@18.3.1",
-    "react-dom/": "https://esm.sh/react-dom@18.3.1/",
-    "react/": "https://esm.sh/react@18.3.1/",
-    "lucide-react": "https://esm.sh/lucide-react@0.344.0",
-    "@huggingface/transformers": "https://esm.sh/@huggingface/transformers@3.8.1?bundle-deps",
-    "buffer": "https://esm.sh/buffer@6.0.3",
-    "long": "https://esm.sh/long@5.2.3",
-    "three": "https://esm.sh/three@0.164.0",
-    "@react-three/fiber": "https://esm.sh/@react-three/fiber@8.16.6?external=react,react-dom,three",
-    "@react-three/drei": "https://esm.sh/@react-three/drei@9.105.6?external=react,react-dom,three,@react-three/fiber"
-  }
-}
-</script>
-<script type="module">
-  import { Buffer } from 'buffer';
-  window.Buffer = Buffer;
-</script>
-<script>
-  // Runtime fallback for hosts that don't apply Vite define replacements.
-  window.__APP_VERSION__ = window.__APP_VERSION__ || '0.0.0';
-</script>
-<link rel="stylesheet" href="/index.css">
+<link rel="stylesheet" href="/src/index.css">
 </head>
   <body class="bg-gray-950 text-white overflow-hidden h-dvh min-h-dvh w-screen">
     <div id="root" class="h-full min-h-full w-full"></div>
-  <script type="module" src="/index.tsx"></script>
+  <script type="module" src="/src/index.tsx"></script>
 </body>
 </html>

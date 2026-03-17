@@ -45,7 +45,9 @@
     0 0 0 2px #09090b,
     0 0 0 4px rgba(45, 212, 191, calc(0.2 + (1 - var(--precision-scale)) * 0.35));
   pointer-events: none;
-  transition: transform 80ms ease-out, box-shadow 120ms ease-out;
+  transition:
+    transform 80ms ease-out,
+    box-shadow 120ms ease-out;
 }
 
 .tone-slider:focus-visible {
@@ -68,7 +70,9 @@
   border-radius: 0.5rem;
   overflow: hidden;
   background: linear-gradient(180deg, #111116, #09090b);
-  transition: border-color 140ms ease, box-shadow 140ms ease;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease;
 }
 
 .draggable-number:hover:not(.is-disabled) {
@@ -122,7 +126,10 @@
   cursor: ew-resize;
   touch-action: none;
   user-select: none;
-  transition: color 120ms ease, background-color 120ms ease, border-color 120ms ease;
+  transition:
+    color 120ms ease,
+    background-color 120ms ease,
+    border-color 120ms ease;
 }
 
 .draggable-number__handle::after {

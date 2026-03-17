@@ -14,8 +14,7 @@ interface CheckboxCardProps {
   showIndicator?: boolean;
 }
 
-const joinClasses = (...classes: Array<string | undefined | false>) =>
-  classes.filter(Boolean).join(' ');
+const joinClasses = (...classes: Array<string | undefined | false>) => classes.filter(Boolean).join(' ');
 
 const CheckboxCard: React.FC<CheckboxCardProps> = ({
   checked,
@@ -34,15 +33,10 @@ const CheckboxCard: React.FC<CheckboxCardProps> = ({
       className={joinClasses(
         'relative cursor-pointer group rounded-xl border transition-all',
         checked ? checkedClassName : uncheckedClassName,
-        className
+        className,
       )}
     >
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className="sr-only"
-      />
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="sr-only" />
       <div className={contentClassName}>{children}</div>
       {showIndicator && checked && (
         <div className={indicatorClassName}>

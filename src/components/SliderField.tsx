@@ -1,5 +1,5 @@
 import React from 'react';
-import PrecisionSlider, { PrecisionSliderProps } from './PrecisionSlider';
+import PrecisionSlider, { PrecisionSliderProps } from '@/components/PrecisionSlider';
 
 interface SliderFieldProps extends Omit<PrecisionSliderProps, 'className'> {
   label: React.ReactNode;
@@ -15,8 +15,7 @@ interface SliderFieldProps extends Omit<PrecisionSliderProps, 'className'> {
   boundsClassName?: string;
 }
 
-const joinClasses = (...classes: Array<string | undefined | false>) =>
-  classes.filter(Boolean).join(' ');
+const joinClasses = (...classes: Array<string | undefined | false>) => classes.filter(Boolean).join(' ');
 
 const SliderField: React.FC<SliderFieldProps> = ({
   label,

@@ -1,16 +1,14 @@
-
-
 export enum ModelSource {
   HUGGINGFACE = 'HUGGINGFACE',
   LOCAL = 'LOCAL',
-  CLASSICAL = 'CLASSICAL'
+  CLASSICAL = 'CLASSICAL',
 }
 
 export enum AppStep {
   INITIALIZE = 0,
   DATASET = 1,
   CLUSTER = 2,
-  VISUALIZE = 3
+  VISUALIZE = 3,
 }
 
 export type DimReductionMethod = 'raw' | 'pca' | 'umap' | 'tsne';
@@ -18,13 +16,13 @@ export type DimReductionMethod = 'raw' | 'pca' | 'umap' | 'tsne';
 export enum ResizeMethod {
   STRETCH = 'STRETCH',
   CROP = 'CROP', // Center Crop
-  PAD = 'PAD' // Letterbox
+  PAD = 'PAD', // Letterbox
 }
 
 export enum PadStyle {
   SOLID = 'SOLID',
   BLUR = 'BLUR',
-  REFLECT = 'REFLECT'
+  REFLECT = 'REFLECT',
 }
 
 export interface ClassicalFeaturesConfig {
@@ -63,7 +61,14 @@ export interface InferenceResult {
   };
 }
 
-export type ProcessingStatus = 'idle' | 'loading_model' | 'processing' | 'ready' | 'error' | 'batch_processing' | 'clustering';
+export type ProcessingStatus =
+  | 'idle'
+  | 'loading_model'
+  | 'processing'
+  | 'ready'
+  | 'error'
+  | 'batch_processing'
+  | 'clustering';
 
 export interface LogEntry {
   timestamp: number;
@@ -106,23 +111,23 @@ export interface ClusteringConfig {
   algorithm: ClusteringAlgorithm;
   metric: DistanceMetric;
   normalize: boolean;
-  
+
   // HDBSCAN / DBSCAN params
   minClusterSize: number;
   minSamples: number;
   epsilon: number; // For DBSCAN radius
   allowSingleCluster: boolean;
-  
+
   // KMeans params
   k: number;
   init: 'random' | 'k-means++'; // simplified
   maxIter: number;
-  
+
   // Agglomerative params
   linkage: LinkageMethod;
   distanceThreshold: number; // For cutting the tree
   nClusters?: number; // Optional force count
-  
+
   // BIRCH params
   birchThreshold: number;
   birchBranching: number;
