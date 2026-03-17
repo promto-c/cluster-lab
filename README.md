@@ -34,23 +34,48 @@ https://promto-c.github.io/cluster-lab/
 - ONNX Runtime Web (WASM assets in `public/onnxruntime`)
 - Three.js + React Three Fiber for 3D visualization
 
+## Architecture Notes
+
+- Runs fully in-browser (no backend required)
+- Uses ONNX Runtime Web (WASM) for model inference
+- Supports both Hugging Face–hosted models and local ONNX files
+- Embeddings and clustering computed client-side
+
 ## Run Locally
 
-Prerequisites: Node.js 18+
+Prerequisites: Node.js 18 or higher
 
 1. Install dependencies:
-   `npm install`
+
+```bash
+npm install
+```
+
 2. Start dev server:
-   `npm run dev`
+
+```bash
+npm run dev
+```
 
 ## Build
 
 1. Sync ONNX Runtime WebAssembly assets (optional; automatically runs before build):
-   `npm run sync:onnx-wasm`
+
+```bash
+npm run sync:onnx-wasm
+```
+
 2. Create production build:
-   `npm run build`
+
+```bash
+npm run build
+```
+
 3. Preview production build:
-   `npm run preview`
+
+```bash
+npm run preview
+```
 
 ## ONNX Runtime WASM Assets
 
@@ -72,3 +97,23 @@ When using **Local Folder** mode, include:
 2. **Embed**: import images (or load examples) and run embeddings.
 3. **Cluster**: pick algorithm/settings, run clustering, and drill down into sub-clusters.
 4. **Visualize**: explore patch-level features in 3D and inspect clusters.
+
+## Acknowledgments
+
+This project builds on top of several excellent open-source libraries and models:
+
+- React, Vite, and the modern frontend ecosystem
+- Three.js and the React Three Fiber ecosystem for 3D visualization
+- Hugging Face ecosystem and contributors for pretrained models (e.g., DINOv2)
+- DINOv2 models developed by Meta AI
+- ONNX Runtime Web for efficient model execution
+- Lucide for iconography
+
+We thank the open-source community for making these tools available.
+
+## License
+
+Licensed under the MIT License. See [LICENSE](LICENSE) for details.
+
+> [!NOTE]
+> Some features rely on third-party models (e.g., DINOv2 via Hugging Face) that are subject to their own licenses. See [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
