@@ -6,6 +6,7 @@ import { GalleryItem, DimReductionMethod } from '@/types';
 import { reducePCA, reduceUMAP, reduceTSNE } from '@/utils/math';
 import { Settings2, AlertTriangle, Loader2, RotateCcw } from 'lucide-react';
 import PrecisionSlider from '@/components/PrecisionSlider';
+import { SegmentedControl } from '@/components/SelectionControls';
 import useMediaQuery from '@/utils/useMediaQuery';
 
 // JSX intrinsics for react-three-fiber
@@ -597,13 +598,30 @@ const ScatterView3D: React.FC<ScatterView3DProps> = ({ items, selectedId, onSele
       <div
         className={`absolute top-2 md:top-4 left-2 right-2 md:left-auto md:right-4 md:w-64 bg-gray-900/90 backdrop-blur-md border border-gray-700 rounded-lg shadow-xl transition-all duration-300 z-30 ${showControls ? 'translate-y-0 md:translate-x-0 opacity-100' : 'translate-y-2 md:translate-y-0 md:translate-x-[110%] opacity-0 pointer-events-none'}`}
       >
-        <div className="p-3 border-b border-gray-700 flex justify-between items-center">
+        <div className="px-3 py-1 border-b border-gray-700 flex justify-between items-center">
           <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 flex items-center gap-2">
             <Settings2 className="w-4 h-4" /> 3D Scatter Controls
           </h3>
-          <button onClick={() => setShowControls(false)} className="md:hidden p-1 text-gray-400 hover:text-white">
-            <Settings2 className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={handleResetCamera}
+              disabled={!layout || isComputing}
+              className="p-1.5 rounded-md border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500 hover:bg-gray-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Reset camera"
+              aria-label="Reset camera"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowControls(false)}
+              className="md:hidden p-1 text-gray-400 hover:text-white"
+              aria-label="Hide controls"
+            >
+              <Settings2 className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         <div className="p-4 space-y-4 text-xs max-h-[65dvh] md:max-h-[60vh] overflow-y-auto">
@@ -612,22 +630,19 @@ const ScatterView3D: React.FC<ScatterView3DProps> = ({ items, selectedId, onSele
             <span className="text-gray-400 block mb-1.5 text-[11px] font-semibold uppercase tracking-wide">
               Mapping
             </span>
-            <div className="grid grid-cols-4 bg-gray-800 rounded p-1 gap-0.5">
-              {(['raw', 'pca', 'umap', 'tsne'] as DimReductionMethod[]).map((m) => (
-                <button
-                  key={m}
-                  onClick={() => setMethod(m)}
-                  disabled={isComputing}
-                  className={`py-1.5 rounded text-center text-[11px] font-medium transition-colors ${
-                    method === m
-                      ? 'bg-gray-700 text-white shadow'
-                      : 'text-gray-400 hover:text-white disabled:opacity-40'
-                  }`}
-                >
-                  {m === 'tsne' ? 't-SNE' : m === 'raw' ? 'Raw' : m.toUpperCase()}
-                </button>
-              ))}
-            </div>
+            <SegmentedControl
+              ariaLabel="3D mapping selector"
+              value={method}
+              onChange={setMethod}
+              className="grid grid-cols-4 gap-0.5 rounded p-1 bg-gray-950/50"
+              buttonClassName="py-1.5 text-center text-[11px] font-medium"
+              options={[
+                { value: 'raw', label: 'Raw', disabled: isComputing },
+                { value: 'pca', label: 'PCA', disabled: isComputing },
+                { value: 'umap', label: 'UMAP', disabled: isComputing },
+                { value: 'tsne', label: 't-SNE', disabled: isComputing },
+              ]}
+            />
           </div>
 
           <div className="h-px bg-gray-700" />
@@ -685,17 +700,6 @@ const ScatterView3D: React.FC<ScatterView3DProps> = ({ items, selectedId, onSele
               />
             </div>
           </div>
-
-          <div className="h-px bg-gray-700" />
-
-          {/* Reset Camera */}
-          <button
-            onClick={handleResetCamera}
-            className="w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500 transition-colors"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            Reset Camera
-          </button>
         </div>
       </div>
 

@@ -95,7 +95,7 @@ export const AlgorithmHelpButton: React.FC<AlgorithmHelpButtonProps> = ({ algori
     aria-label={`Explain how ${CLUSTERING_ALGORITHM_LABELS[algorithm]} works`}
     aria-pressed={isOpen}
     title={`About ${CLUSTERING_ALGORITHM_LABELS[algorithm]}`}
-    className={`h-7 w-7 shrink-0 rounded-full px-0 py-0 text-[11px] font-bold ${
+    className={`h-8 w-8 shrink-0 rounded-md font-bold leading-none ${
       isOpen
         ? 'border-accent-400/60 bg-accent-500/15 text-accent-200 hover:border-accent-300 hover:text-white hover:bg-accent-500/20'
         : 'border-gray-700 bg-gray-950/80 text-gray-400 hover:border-gray-500 hover:text-white'

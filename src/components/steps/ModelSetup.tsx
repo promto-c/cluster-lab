@@ -23,6 +23,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import CheckboxCard from '@/components/CheckboxCard';
+import { SelectableSwatchButton } from '@/components/SelectionControls';
 import SelectDropdown, { type SelectDropdownOption } from '@/components/SelectDropdown';
 import useMediaQuery from '@/utils/useMediaQuery';
 import {
@@ -916,7 +917,8 @@ const ModelSetup: React.FC<ModelSetupProps> = ({
                         >
                           <span className="text-[10px] text-gray-400 font-semibold">Background</span>
                           <div className="flex gap-2">
-                            <button
+                            <SelectableSwatchButton
+                              isSelected={config.preprocessing.padStyle === PadStyle.BLUR}
                               onClick={() =>
                                 onConfigChange({
                                   ...config,
@@ -926,12 +928,14 @@ const ModelSetup: React.FC<ModelSetupProps> = ({
                                   },
                                 })
                               }
-                              className={`w-5 h-5 rounded-full border transition-all overflow-hidden relative ${config.preprocessing.padStyle === PadStyle.BLUR ? 'border-white ring-2 ring-white/30 scale-110' : 'border-gray-600 hover:border-gray-400 opacity-80 hover:opacity-100'}`}
+                              className="w-5 h-5 rounded-full overflow-hidden relative"
+                              unselectedClassName="border-gray-600 hover:border-gray-400 opacity-80 hover:opacity-100"
                               title="Smart Blur"
                             >
                               <div className="absolute inset-0 bg-gradient-to-br from-pink-500 via-purple-500 to-cyan-500 blur-[1px]" />
-                            </button>
-                            <button
+                            </SelectableSwatchButton>
+                            <SelectableSwatchButton
+                              isSelected={config.preprocessing.padStyle === PadStyle.REFLECT}
                               onClick={() =>
                                 onConfigChange({
                                   ...config,
@@ -941,13 +945,18 @@ const ModelSetup: React.FC<ModelSetupProps> = ({
                                   },
                                 })
                               }
-                              className={`w-5 h-5 rounded-full border transition-all overflow-hidden relative ${config.preprocessing.padStyle === PadStyle.REFLECT ? 'border-white ring-2 ring-white/30 scale-110' : 'border-gray-600 hover:border-gray-400 opacity-90 hover:opacity-100'}`}
+                              className="w-5 h-5 rounded-full overflow-hidden relative"
+                              unselectedClassName="border-gray-600 hover:border-gray-400 opacity-90 hover:opacity-100"
                               title="Mirror / Reflect"
                             >
                               <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-600 to-gray-200" />
                               <div className="absolute inset-y-0 left-1/2 w-px bg-gray-900/70 -translate-x-1/2" />
-                            </button>
-                            <button
+                            </SelectableSwatchButton>
+                            <SelectableSwatchButton
+                              isSelected={
+                                config.preprocessing.padStyle === PadStyle.SOLID &&
+                                config.preprocessing.padColor === '#000000'
+                              }
                               onClick={() =>
                                 onConfigChange({
                                   ...config,
@@ -958,10 +967,14 @@ const ModelSetup: React.FC<ModelSetupProps> = ({
                                   },
                                 })
                               }
-                              className={`w-5 h-5 rounded-full border transition-all ${config.preprocessing.padStyle === PadStyle.SOLID && config.preprocessing.padColor === '#000000' ? 'border-white ring-2 ring-white/30 scale-110' : 'border-gray-600 bg-black hover:border-gray-400'}`}
+                              className="w-5 h-5 rounded-full bg-black"
                               title="Solid Black"
                             />
-                            <button
+                            <SelectableSwatchButton
+                              isSelected={
+                                config.preprocessing.padStyle === PadStyle.SOLID &&
+                                config.preprocessing.padColor === '#ffffff'
+                              }
                               onClick={() =>
                                 onConfigChange({
                                   ...config,
@@ -972,7 +985,8 @@ const ModelSetup: React.FC<ModelSetupProps> = ({
                                   },
                                 })
                               }
-                              className={`w-5 h-5 rounded-full border transition-all ${config.preprocessing.padStyle === PadStyle.SOLID && config.preprocessing.padColor === '#ffffff' ? 'border-white ring-2 ring-white/30 scale-110 bg-white' : 'border-gray-600 bg-white opacity-80 hover:opacity-100'}`}
+                              className="w-5 h-5 rounded-full bg-white"
+                              unselectedClassName="border-gray-600 bg-white opacity-80 hover:opacity-100"
                               title="Solid White"
                             />
                           </div>

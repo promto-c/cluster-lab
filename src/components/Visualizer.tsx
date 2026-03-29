@@ -10,6 +10,7 @@ import {
   ChannelRange,
 } from '@/utils/math';
 import { Image as ImageIcon, Settings2, Grid, AlertTriangle } from 'lucide-react';
+import { SegmentedControl, SelectableSwatchButton } from '@/components/SelectionControls';
 import SliderField from '@/components/SliderField';
 import useMediaQuery from '@/utils/useMediaQuery';
 
@@ -270,33 +271,24 @@ const Visualizer: React.FC<VisualizerProps> = ({
 
           <div className="p-4 space-y-5 text-xs max-h-[65dvh] md:max-h-[60vh] overflow-y-auto">
             {/* Mode Select */}
-            <div className="flex bg-gray-800 rounded p-1">
-              <button
-                onClick={() =>
-                  setSettings((s) => ({
-                    ...s,
-                    mode: 'pca',
-                    components: 3,
-                    colormap: 'rgb',
-                  }))
-                }
-                className={`flex-1 py-1.5 rounded text-center transition-colors ${settings.mode === 'pca' ? 'bg-gray-700 text-white shadow' : 'text-gray-400 hover:text-white'}`}
-              >
-                PCA
-              </button>
-              <button
-                onClick={() =>
-                  setSettings((s) => ({
-                    ...s,
-                    mode: 'channel',
-                    colormap: 'viridis',
-                  }))
-                }
-                className={`flex-1 py-1.5 rounded text-center transition-colors ${settings.mode === 'channel' ? 'bg-gray-700 text-white shadow' : 'text-gray-400 hover:text-white'}`}
-              >
-                Channel
-              </button>
-            </div>
+            <SegmentedControl
+              ariaLabel="Visualization mode selector"
+              value={settings.mode}
+              onChange={(mode) =>
+                setSettings((s) => ({
+                  ...s,
+                  mode,
+                  components: mode === 'pca' ? 3 : s.components,
+                  colormap: mode === 'pca' ? 'rgb' : 'viridis',
+                }))
+              }
+              className="flex gap-0.5 rounded p-1 bg-gray-800"
+              buttonClassName="flex-1 py-1.5 text-center text-xs font-medium"
+              options={[
+                { value: 'pca', label: 'PCA' },
+                { value: 'channel', label: 'Channel' },
+              ]}
+            />
 
             {/* Channel Slider */}
             {settings.mode === 'channel' && (
@@ -332,32 +324,22 @@ const Visualizer: React.FC<VisualizerProps> = ({
                       i
                     </button>
                   </div>
-                  <div className="flex gap-1">
-                    <button
-                      onClick={() =>
-                        setSettings((s) => ({
-                          ...s,
-                          components: 1,
-                          colormap: 'viridis',
-                        }))
-                      }
-                      className={`px-2 py-1 rounded border ${settings.components === 1 ? 'border-accent-500 text-accent-400 bg-accent-500/10' : 'border-gray-700 text-gray-500'}`}
-                    >
-                      1
-                    </button>
-                    <button
-                      onClick={() =>
-                        setSettings((s) => ({
-                          ...s,
-                          components: 3,
-                          colormap: 'rgb',
-                        }))
-                      }
-                      className={`px-2 py-1 rounded border ${settings.components === 3 ? 'border-accent-500 text-accent-400 bg-accent-500/10' : 'border-gray-700 text-gray-500'}`}
-                    >
-                      3
-                    </button>
-                  </div>
+                  <SegmentedControl
+                    ariaLabel="PCA component count selector"
+                    value={settings.components}
+                    onChange={(components) =>
+                      setSettings((s) => ({
+                        ...s,
+                        components,
+                        colormap: components === 1 ? 'viridis' : 'rgb',
+                      }))
+                    }
+                    buttonClassName="px-2 py-1 text-[11px] font-medium"
+                    options={[
+                      { value: 1, label: '1' },
+                      { value: 3, label: '3' },
+                    ]}
+                  />
                 </div>
 
                 <div className="flex items-center justify-between gap-2">
@@ -425,8 +407,9 @@ const Visualizer: React.FC<VisualizerProps> = ({
                 <span className="text-gray-400 block mb-1">Colormap</span>
                 <div className="grid grid-cols-5 gap-1">
                   {['viridis', 'plasma', 'inferno', 'magma', 'grayscale'].map((cm) => (
-                    <button
+                    <SelectableSwatchButton
                       key={cm}
+                      isSelected={settings.colormap === cm}
                       onClick={() =>
                         setSettings((s) => ({
                           ...s,
@@ -434,7 +417,8 @@ const Visualizer: React.FC<VisualizerProps> = ({
                         }))
                       }
                       title={cm}
-                      className={`h-4 rounded-sm border transition-all ${settings.colormap === cm ? 'border-white scale-110' : 'border-transparent opacity-60 hover:opacity-100'}`}
+                      className="h-4 rounded-sm"
+                      unselectedClassName="border-transparent opacity-60 hover:border-gray-500/40 hover:opacity-100"
                       style={{
                         background: `linear-gradient(to right, ${getGradientColors(cm)})`,
                       }}

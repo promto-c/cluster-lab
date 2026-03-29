@@ -23,6 +23,7 @@ import ClusteringMethodGuide, {
   CLUSTERING_ALGORITHM_LABELS,
 } from '@/components/ClusteringMethodGuide';
 import DraggableNumberInput, { DraggableNumberInputProps } from '@/components/DraggableNumberInput';
+import { SegmentedControl } from '@/components/SelectionControls';
 import {
   RefreshCw,
   Layers,
@@ -109,12 +110,16 @@ const ALGORITHM_SEGMENTS: Array<{
   },
 ];
 
-const SIMPLE_SEGMENTED_CONTROL_FRAME_CLASS = 'bg-gray-950/30 p-1 rounded-lg border border-gray-800';
+const CLUSTERING_TOOLBAR_GROUP_CLASS =
+  'flex flex-wrap items-center gap-2 rounded-xl border border-gray-800 bg-gray-950/40 p-1.5 shadow-sm';
 
-const getSimpleSegmentButtonClassName = (isActive: boolean, layoutClassName = 'flex-1') =>
-  `${layoutClassName} text-[10px] font-bold py-2 rounded-md transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500/30 ${
-    isActive ? 'bg-gray-800 text-white shadow-sm border border-gray-700' : 'text-gray-500 hover:text-gray-300'
-  }`;
+const CLUSTERING_TOOLBAR_LABEL_CLASS =
+  'inline-flex h-8 items-center px-1 text-[10px] font-bold uppercase tracking-[0.16em] text-gray-500';
+
+const CLUSTERING_TOOLBAR_SEGMENTED_CLASS = 'inline-flex min-w-max flex-wrap items-center gap-0.5';
+
+const CLUSTERING_TOOLBAR_SEGMENT_BUTTON_CLASS =
+  'inline-flex h-8 shrink-0 items-center justify-center whitespace-nowrap rounded-md px-2.5 text-center text-[10px] font-bold uppercase tracking-[0.08em] leading-none';
 
 // Breadcrumb Separator with Dropdown
 const BreadcrumbSeparator: React.FC<{
@@ -165,7 +170,7 @@ const BreadcrumbSeparator: React.FC<{
 
       {isOpen && (
         <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 w-32 bg-gray-900 border border-gray-700 rounded-lg shadow-xl z-50 py-1 animate-in fade-in zoom-in-95 duration-150">
-          <div className="px-2 py-1 text-[9px] font-bold text-gray-500 uppercase border-b border-gray-800 mb-1">
+          <div className="px-2 py-1 text-[10px] font-bold text-gray-500 uppercase border-b border-gray-800 mb-1">
             Select Sibling
           </div>
           <div className="max-h-40 overflow-y-auto scrollbar-thin">
@@ -1212,166 +1217,140 @@ const ClusteringView: React.FC<ClusteringViewProps> = ({
       >
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 shadow-xl max-h-[72dvh] md:max-h-none overflow-y-auto">
           {/* Algorithm Selection Tabs */}
-          <div className="flex flex-wrap pb-2 gap-2 items-center">
-            <div
-              className={`${SIMPLE_SEGMENTED_CONTROL_FRAME_CLASS} inline-flex min-w-max gap-1`}
-              role="group"
-              aria-label="Clustering method selector"
-            >
-              {ALGORITHM_SEGMENTS.map(({ algorithm, description }) => {
-                const isActive = config.algorithm === algorithm;
+          <div className="pb-2">
+            <div className="flex flex-wrap items-start justify-between gap-1.5">
+              <div className="flex min-w-0 flex-1 flex-wrap items-stretch gap-1.5">
+                <div className={CLUSTERING_TOOLBAR_GROUP_CLASS}>
+                  <SegmentedControl
+                    ariaLabel="Clustering method selector"
+                    value={config.algorithm}
+                    onChange={handleAlgorithmSelect}
+                    className={CLUSTERING_TOOLBAR_SEGMENTED_CLASS}
+                    buttonClassName={CLUSTERING_TOOLBAR_SEGMENT_BUTTON_CLASS}
+                    options={ALGORITHM_SEGMENTS.map(({ algorithm, description }) => ({
+                      value: algorithm,
+                      label: CLUSTERING_ALGORITHM_LABELS[algorithm],
+                      title: description,
+                    }))}
+                  />
+                  <AlgorithmHelpButton
+                    algorithm={config.algorithm}
+                    isOpen={showAlgorithmHelp}
+                    onClick={() => setShowAlgorithmHelp((prev) => !prev)}
+                  />
+                </div>
 
-                return (
+                <div className={CLUSTERING_TOOLBAR_GROUP_CLASS}>
+                  <span className={`${CLUSTERING_TOOLBAR_LABEL_CLASS} gap-1`}>
+                    <Scale className="w-3 h-3" /> Preprocess
+                  </span>
+
+                  <SegmentedControl
+                    ariaLabel="Distance metric selector"
+                    value={config.metric}
+                    onChange={(metric) => setConfig({ ...config, metric })}
+                    className={CLUSTERING_TOOLBAR_SEGMENTED_CLASS}
+                    buttonClassName={`${CLUSTERING_TOOLBAR_SEGMENT_BUTTON_CLASS} normal-case tracking-normal`}
+                    options={[
+                      { value: 'COSINE', label: 'Cosine Similarity' },
+                      { value: 'EUCLIDEAN', label: 'Euclidean Distance' },
+                    ]}
+                  />
+
                   <button
-                    key={algorithm}
                     type="button"
-                    onClick={() => handleAlgorithmSelect(algorithm)}
-                    aria-pressed={isActive}
-                    title={description}
-                    className={getSimpleSegmentButtonClassName(
-                      isActive,
-                      'shrink-0 whitespace-nowrap px-3 text-center uppercase tracking-wide',
-                    )}
+                    onClick={() => setConfig({ ...config, normalize: !config.normalize })}
+                    className={`inline-flex h-8 min-w-[7.5rem] items-center rounded-md border px-2.5 text-left transition-colors ${
+                      config.normalize
+                        ? 'border-accent-500/30 bg-accent-500/10'
+                        : 'border-gray-800 bg-gray-950/30 hover:border-gray-700'
+                    }`}
                   >
-                    {CLUSTERING_ALGORITHM_LABELS[algorithm]}
+                    <div className="flex w-full items-center justify-between gap-2">
+                      <span className="text-[11px] font-semibold leading-none text-gray-300">L2 Norm</span>
+                      <span
+                        className={`h-4 w-8 rounded-full p-0.5 transition-colors ${config.normalize ? 'bg-accent-600' : 'bg-gray-700'}`}
+                      >
+                        <span
+                          className={`block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform ${config.normalize ? 'translate-x-4' : 'translate-x-0'}`}
+                        ></span>
+                      </span>
+                    </div>
                   </button>
-                );
-              })}
+                </div>
+              </div>
+
+              <button
+                onClick={handleResetDefaults}
+                disabled={tuningState.active}
+                className={`inline-flex h-8 shrink-0 items-center justify-center gap-2 self-start rounded-md border px-3 text-[10px] font-bold uppercase transition-colors group ${
+                  tuningState.active
+                    ? 'border-accent-500/30 bg-accent-500/10 text-accent-300 cursor-wait'
+                    : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:text-white hover:bg-gray-700'
+                }`}
+                title="Reset selected algorithm defaults and optimize when supported"
+              >
+                {tuningState.active ? (
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <RotateCcw className="w-3.5 h-3.5 group-hover:-rotate-180 transition-transform duration-500" />
+                )}
+                {tuningState.active ? `${tuningState.progress}%` : 'Reset'}
+              </button>
             </div>
-            <AlgorithmHelpButton
-              algorithm={config.algorithm}
-              isOpen={showAlgorithmHelp}
-              onClick={() => setShowAlgorithmHelp((prev) => !prev)}
-            />
+
+            {readyCount < 5 && <p className="px-1 text-[10px] text-gray-600">Need at least 5 items for optimization.</p>}
           </div>
 
           {showAlgorithmHelp && (
             <ClusteringMethodGuide algorithm={config.algorithm} onClose={() => setShowAlgorithmHelp(false)} />
           )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Main Parameters Area */}
-            <div className="lg:col-span-2 space-y-4">
-              {/* Dendrogram Visualization for Agglomerative */}
-              {config.algorithm === 'AGGLOMERATIVE' && (
-                <div className="bg-gray-950/50 rounded-lg border border-gray-800 p-3 relative group">
-                  <div className="flex justify-between items-center mb-2">
-                    <label className="text-xs font-bold text-gray-400 flex items-center gap-2">
-                      <Activity className="w-3 h-3" /> Dendrogram Cut
-                    </label>
-                    <span className="text-[10px] text-gray-600 bg-gray-900 px-2 py-0.5 rounded">
-                      Drag pink line to adjust clusters
-                    </span>
-                  </div>
-
-                  {linkageData ? (
-                    <Dendrogram
-                      linkage={linkageData}
-                      threshold={config.distanceThreshold}
-                      onThresholdChange={(val) =>
-                        setConfig({
-                          ...config,
-                          distanceThreshold: val,
-                          nClusters: undefined,
-                        })
-                      }
-                      height={140}
-                      color="#60a5fa"
-                    />
-                  ) : (
-                    <div className="h-[140px] border-2 border-dashed border-gray-800 rounded flex flex-col items-center justify-center text-gray-600 gap-2">
-                      <Layers className="w-6 h-6 opacity-20" />
-                      <span className="text-xs">Run clustering to generate tree</span>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Parameter Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                <AlgorithmParameterGrid
-                  config={config}
-                  projectedK={projectedK}
-                  linkageData={linkageData}
-                  onConfigChange={setConfig}
-                  onClusterCountChange={handleClusterCountChange}
-                />
-              </div>
-            </div>
-
-            {/* Right Column: General Settings & Actions */}
-            <div className="flex flex-col gap-6 lg:border-l lg:border-gray-800 lg:pl-6">
-              {/* Data Settings */}
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-gray-500 uppercase flex items-center gap-2">
-                    <Scale className="w-3 h-3" /> Data Processing
+          <div className="space-y-4">
+            {/* Dendrogram Visualization for Agglomerative */}
+            {config.algorithm === 'AGGLOMERATIVE' && (
+              <div className="bg-gray-950/50 rounded-lg border border-gray-800 p-3 relative group">
+                <div className="flex justify-between items-center mb-2">
+                  <label className="text-xs font-bold text-gray-400 flex items-center gap-2">
+                    <Activity className="w-3 h-3" /> Dendrogram Cut
                   </label>
+                  <span className="text-[10px] text-gray-600 bg-gray-900 px-2 py-0.5 rounded">
+                    Drag pink line to adjust clusters
+                  </span>
+                </div>
 
-                  <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] gap-2">
-                    <div className={`${SIMPLE_SEGMENTED_CONTROL_FRAME_CLASS} flex gap-1`}>
-                      {(['COSINE', 'EUCLIDEAN'] as DistanceMetric[]).map((m) => (
-                        <button
-                          key={m}
-                          onClick={() => setConfig({ ...config, metric: m })}
-                          className={getSimpleSegmentButtonClassName(config.metric === m)}
-                        >
-                          {m === 'COSINE' ? 'Cosine Similarity' : 'Euclidean Distance'}
-                        </button>
-                      ))}
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setConfig({ ...config, normalize: !config.normalize })}
-                      className={`p-2 rounded-lg border text-left transition-colors ${
-                        config.normalize
-                          ? 'border-accent-500/30 bg-accent-500/10'
-                          : 'border-gray-800 bg-gray-950/30 hover:border-gray-700'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-gray-300">L2 Norm</span>
-                        <span
-                          className={`w-9 h-5 rounded-full p-0.5 transition-colors ${config.normalize ? 'bg-accent-600' : 'bg-gray-700'}`}
-                        >
-                          <span
-                            className={`block w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${config.normalize ? 'translate-x-4' : 'translate-x-0'}`}
-                          ></span>
-                        </span>
-                      </div>
-                      {/* <p className="text-[10px] text-gray-500 mt-1">Vector normalize</p> */}
-                    </button>
+                {linkageData ? (
+                  <Dendrogram
+                    linkage={linkageData}
+                    threshold={config.distanceThreshold}
+                    onThresholdChange={(val) =>
+                      setConfig({
+                        ...config,
+                        distanceThreshold: val,
+                        nClusters: undefined,
+                      })
+                    }
+                    height={140}
+                    color="#60a5fa"
+                  />
+                ) : (
+                  <div className="h-[140px] border-2 border-dashed border-gray-800 rounded flex flex-col items-center justify-center text-gray-600 gap-2">
+                    <Layers className="w-6 h-6 opacity-20" />
+                    <span className="text-xs">Run clustering to generate tree</span>
                   </div>
-                </div>
-              </div>
-
-              {/* Actions */}
-              <div className="flex flex-col gap-3 mt-auto pt-4 border-t border-gray-800">
-                <div className="grid gap-3 grid-cols-1">
-                  <button
-                    onClick={handleResetDefaults}
-                    disabled={tuningState.active}
-                    className={`flex items-center justify-center gap-2 py-3 px-3 rounded-lg border transition-colors text-xs font-bold group ${
-                      tuningState.active
-                        ? 'border-accent-500/30 bg-accent-500/10 text-accent-300 cursor-wait'
-                        : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:text-white hover:bg-gray-700'
-                    }`}
-                    title="Reset selected algorithm defaults and optimize when supported"
-                  >
-                    {tuningState.active ? (
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <RotateCcw className="w-3.5 h-3.5 group-hover:-rotate-180 transition-transform duration-500" />
-                    )}
-                    {tuningState.active ? `${tuningState.progress}%` : 'Reset'}
-                  </button>
-                </div>
-
-                {readyCount < 5 && (
-                  <p className="text-[10px] text-center text-gray-600">Need at least 5 items for optimization.</p>
                 )}
               </div>
+            )}
+
+            {/* Parameter Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+              <AlgorithmParameterGrid
+                config={config}
+                projectedK={projectedK}
+                linkageData={linkageData}
+                onConfigChange={setConfig}
+                onClusterCountChange={handleClusterCountChange}
+              />
             </div>
           </div>
         </div>
