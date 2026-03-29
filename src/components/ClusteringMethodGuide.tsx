@@ -74,6 +74,13 @@ export const CLUSTERING_ALGORITHM_LABELS: Record<ClusteringAlgorithm, string> = 
   BIRCH: 'BIRCH',
 };
 
+export const CLUSTERING_ALGORITHM_EYEBROWS: Record<ClusteringAlgorithm, string> = {
+  AGGLOMERATIVE: 'Tree Cut',
+  HDBSCAN: 'Density',
+  KMEANS: 'Centroid',
+  BIRCH: 'Prototype',
+};
+
 interface AlgorithmHelpButtonProps {
   algorithm: ClusteringAlgorithm;
   isOpen: boolean;
@@ -105,6 +112,7 @@ interface ClusteringMethodGuideProps {
 
 const ClusteringMethodGuide: React.FC<ClusteringMethodGuideProps> = ({ algorithm, onClose }) => {
   const help = ALGORITHM_HELP[algorithm];
+  const eyebrow = CLUSTERING_ALGORITHM_EYEBROWS[algorithm];
 
   return (
     <div className="mb-4 rounded-xl border border-accent-500/20 bg-gradient-to-br from-accent-500/10 via-gray-950 to-gray-950 p-4 shadow-lg animate-in fade-in slide-in-from-top-1 duration-200">
@@ -114,7 +122,12 @@ const ClusteringMethodGuide: React.FC<ClusteringMethodGuideProps> = ({ algorithm
             <HelpCircle className="w-4 h-4 shrink-0" />
             <p className="text-[10px] font-bold uppercase tracking-[0.2em]">Method Guide</p>
           </div>
-          <h3 className="mt-1 text-sm font-semibold text-white">{help.title}</h3>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <h3 className="text-sm font-semibold text-white">{help.title}</h3>
+            <span className="inline-flex rounded-full border border-accent-400/30 bg-accent-400/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] text-accent-100">
+              {eyebrow}
+            </span>
+          </div>
           <p className="mt-1 text-xs leading-relaxed text-gray-300">{help.summary}</p>
         </div>
 

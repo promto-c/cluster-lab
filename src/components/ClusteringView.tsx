@@ -19,6 +19,7 @@ import Gallery from '@/components/Gallery';
 import HeaderBar from '@/components/HeaderBar';
 import ClusteringMethodGuide, {
   AlgorithmHelpButton,
+  CLUSTERING_ALGORITHM_EYEBROWS,
   CLUSTERING_ALGORITHM_LABELS,
 } from '@/components/ClusteringMethodGuide';
 import DraggableNumberInput, { DraggableNumberInputProps } from '@/components/DraggableNumberInput';
@@ -85,6 +86,35 @@ const applyLabelsAtDepth = (sourceItems: GalleryItem[], labels: Map<string, numb
   });
 
 const DEFAULT_AGGLOMERATIVE_CUT = 0.4;
+
+const ALGORITHM_SEGMENTS: Array<{
+  algorithm: ClusteringAlgorithm;
+  description: string;
+}> = [
+  {
+    algorithm: 'AGGLOMERATIVE',
+    description: 'Best for hierarchy-aware drill-down and dendrogram tuning.',
+  },
+  {
+    algorithm: 'HDBSCAN',
+    description: 'Groups dense neighborhoods and naturally leaves sparse noise.',
+  },
+  {
+    algorithm: 'KMEANS',
+    description: 'Fast fixed-k partitioning around iterated cluster centers.',
+  },
+  {
+    algorithm: 'BIRCH',
+    description: 'Quick prototype mode for lightweight, incremental-style runs.',
+  },
+];
+
+const SIMPLE_SEGMENTED_CONTROL_FRAME_CLASS = 'bg-gray-950/30 p-1 rounded-lg border border-gray-800';
+
+const getSimpleSegmentButtonClassName = (isActive: boolean, layoutClassName = 'flex-1') =>
+  `${layoutClassName} text-[10px] font-bold py-2 rounded-md transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500/30 ${
+    isActive ? 'bg-gray-800 text-white shadow-sm border border-gray-700' : 'text-gray-500 hover:text-gray-300'
+  }`;
 
 // Breadcrumb Separator with Dropdown
 const BreadcrumbSeparator: React.FC<{
@@ -570,6 +600,8 @@ const ClusteringView: React.FC<ClusteringViewProps> = ({
   const [configCache, setConfigCache] = useState<Record<string, ClusteringConfig>>({
     '': defaultConfig,
   });
+  const currentAlgorithmLabel = CLUSTERING_ALGORITHM_LABELS[config.algorithm];
+  const currentAlgorithmEyebrow = CLUSTERING_ALGORITHM_EYEBROWS[config.algorithm];
 
   const [stats, setStats] = useState<{
     clusters: number;
@@ -1180,36 +1212,37 @@ const ClusteringView: React.FC<ClusteringViewProps> = ({
       >
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 shadow-xl max-h-[72dvh] md:max-h-none overflow-y-auto">
           {/* Algorithm Selection Tabs */}
-          <div className="mb-6 border-b border-gray-800 pb-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex flex-nowrap md:flex-wrap gap-2 overflow-x-auto scrollbar-thin">
-                {(['AGGLOMERATIVE', 'HDBSCAN', 'KMEANS', 'BIRCH'] as ClusteringAlgorithm[]).map((algo) => (
-                  <button
-                    key={algo}
-                    onClick={() => handleAlgorithmSelect(algo)}
-                    className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wide transition-all shrink-0
-                          ${
-                            config.algorithm === algo
-                              ? 'bg-accent-600 text-white shadow-lg shadow-accent-900/20 scale-105'
-                              : 'bg-gray-800 text-gray-500 hover:bg-gray-750 hover:text-gray-300'
-                          }`}
-                  >
-                    {CLUSTERING_ALGORITHM_LABELS[algo]}
-                  </button>
-                ))}
-              </div>
+          <div className="flex flex-wrap pb-2 gap-2 items-center">
+            <div
+              className={`${SIMPLE_SEGMENTED_CONTROL_FRAME_CLASS} inline-flex min-w-max gap-1`}
+              role="group"
+              aria-label="Clustering method selector"
+            >
+              {ALGORITHM_SEGMENTS.map(({ algorithm, description }) => {
+                const isActive = config.algorithm === algorithm;
 
-              <div className="flex items-center gap-2 shrink-0">
-                <span className="hidden md:inline text-[10px] font-bold uppercase tracking-wide text-gray-500">
-                  About {CLUSTERING_ALGORITHM_LABELS[config.algorithm]}
-                </span>
-                <AlgorithmHelpButton
-                  algorithm={config.algorithm}
-                  isOpen={showAlgorithmHelp}
-                  onClick={() => setShowAlgorithmHelp((prev) => !prev)}
-                />
-              </div>
+                return (
+                  <button
+                    key={algorithm}
+                    type="button"
+                    onClick={() => handleAlgorithmSelect(algorithm)}
+                    aria-pressed={isActive}
+                    title={description}
+                    className={getSimpleSegmentButtonClassName(
+                      isActive,
+                      'shrink-0 whitespace-nowrap px-3 text-center uppercase tracking-wide',
+                    )}
+                  >
+                    {CLUSTERING_ALGORITHM_LABELS[algorithm]}
+                  </button>
+                );
+              })}
             </div>
+            <AlgorithmHelpButton
+              algorithm={config.algorithm}
+              isOpen={showAlgorithmHelp}
+              onClick={() => setShowAlgorithmHelp((prev) => !prev)}
+            />
           </div>
 
           {showAlgorithmHelp && (
@@ -1276,12 +1309,12 @@ const ClusteringView: React.FC<ClusteringViewProps> = ({
                   </label>
 
                   <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] gap-2">
-                    <div className="bg-gray-950/30 p-1 rounded-lg border border-gray-800 flex gap-1">
+                    <div className={`${SIMPLE_SEGMENTED_CONTROL_FRAME_CLASS} flex gap-1`}>
                       {(['COSINE', 'EUCLIDEAN'] as DistanceMetric[]).map((m) => (
                         <button
                           key={m}
                           onClick={() => setConfig({ ...config, metric: m })}
-                          className={`flex-1 text-[10px] font-bold py-2 rounded-md transition-all ${config.metric === m ? 'bg-gray-800 text-white shadow-sm border border-gray-700' : 'text-gray-500 hover:text-gray-300'}`}
+                          className={getSimpleSegmentButtonClassName(config.metric === m)}
                         >
                           {m === 'COSINE' ? 'Cosine Similarity' : 'Euclidean Distance'}
                         </button>
