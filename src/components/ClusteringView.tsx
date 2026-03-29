@@ -17,6 +17,10 @@ import {
 import Dendrogram from '@/components/Dendrogram';
 import Gallery from '@/components/Gallery';
 import HeaderBar from '@/components/HeaderBar';
+import ClusteringMethodGuide, {
+  AlgorithmHelpButton,
+  CLUSTERING_ALGORITHM_LABELS,
+} from '@/components/ClusteringMethodGuide';
 import DraggableNumberInput, { DraggableNumberInputProps } from '@/components/DraggableNumberInput';
 import {
   RefreshCw,
@@ -541,6 +545,7 @@ const ClusteringView: React.FC<ClusteringViewProps> = ({
   const isMobile = useMediaQuery('(max-width: 767px)');
   const [showConfig, setShowConfig] = useState(false);
   const [showMobileQuickControls, setShowMobileQuickControls] = useState(false);
+  const [showAlgorithmHelp, setShowAlgorithmHelp] = useState(false);
 
   // Default Config
   const defaultConfig: ClusteringConfig = {
@@ -620,6 +625,10 @@ const ClusteringView: React.FC<ClusteringViewProps> = ({
     progress: 0,
     message: '',
   });
+
+  const handleAlgorithmSelect = (algorithm: ClusteringAlgorithm) => {
+    setConfig((prev) => ({ ...prev, algorithm }));
+  };
 
   useEffect(() => {
     if (isMobile) return;
@@ -1171,28 +1180,41 @@ const ClusteringView: React.FC<ClusteringViewProps> = ({
       >
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 shadow-xl max-h-[72dvh] md:max-h-none overflow-y-auto">
           {/* Algorithm Selection Tabs */}
-          <div className="flex flex-nowrap md:flex-wrap gap-2 mb-6 border-b border-gray-800 pb-4 overflow-x-auto scrollbar-thin">
-            {(['AGGLOMERATIVE', 'HDBSCAN', 'KMEANS', 'BIRCH'] as ClusteringAlgorithm[]).map((algo) => (
-              <button
-                key={algo}
-                onClick={() => setConfig({ ...config, algorithm: algo })}
-                className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wide transition-all shrink-0
+          <div className="mb-6 border-b border-gray-800 pb-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex flex-nowrap md:flex-wrap gap-2 overflow-x-auto scrollbar-thin">
+                {(['AGGLOMERATIVE', 'HDBSCAN', 'KMEANS', 'BIRCH'] as ClusteringAlgorithm[]).map((algo) => (
+                  <button
+                    key={algo}
+                    onClick={() => handleAlgorithmSelect(algo)}
+                    className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wide transition-all shrink-0
                           ${
                             config.algorithm === algo
                               ? 'bg-accent-600 text-white shadow-lg shadow-accent-900/20 scale-105'
                               : 'bg-gray-800 text-gray-500 hover:bg-gray-750 hover:text-gray-300'
                           }`}
-              >
-                {algo === 'HDBSCAN'
-                  ? 'HDBSCAN'
-                  : algo === 'KMEANS'
-                    ? 'K-Means'
-                    : algo === 'BIRCH'
-                      ? 'BIRCH'
-                      : 'Agglomerative'}
-              </button>
-            ))}
+                  >
+                    {CLUSTERING_ALGORITHM_LABELS[algo]}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="hidden md:inline text-[10px] font-bold uppercase tracking-wide text-gray-500">
+                  About {CLUSTERING_ALGORITHM_LABELS[config.algorithm]}
+                </span>
+                <AlgorithmHelpButton
+                  algorithm={config.algorithm}
+                  isOpen={showAlgorithmHelp}
+                  onClick={() => setShowAlgorithmHelp((prev) => !prev)}
+                />
+              </div>
+            </div>
           </div>
+
+          {showAlgorithmHelp && (
+            <ClusteringMethodGuide algorithm={config.algorithm} onClose={() => setShowAlgorithmHelp(false)} />
+          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Main Parameters Area */}
